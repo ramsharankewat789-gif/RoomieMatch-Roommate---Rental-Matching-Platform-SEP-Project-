@@ -1,65 +1,129 @@
-import { useState, useEffect } from "react";
-import { mockProperties } from "../data/mockProperties";
+/**
+ * useProperties.js — Real API hook for property data.
+ *
+ * Replaces the localStorage/mockProperties implementation.
+ * All data comes from POST/GET /api/properties endpoints.
+ *
+ * Usage:
+ *   const { properties, loading, error, reload,
+ *           createProperty, editProperty, deleteProperty } = useProperties(params);
+ *
+ * params — optional query object forwarded to GET /api/properties
+ *   e.g. { ownerId, status, verified, search, city, page, limit }
+ */
+import { useState, useEffect, useCallback } from "react";
+import {
+  apiListProperties,
+  apiCreateProperty,
+  apiUpdateProperty,
+  apiDeleteProperty,
+  apiVerifyProperty,
+  apiUpdatePropertyStatus,
+  apiUploadPropertyImages,
+} from "../services/api";
 
-export const useProperties = () => {
-  const [properties, setProperties] = useState(() => {
-    const saved = localStorage.getItem("roomiematch_properties");
-    return saved ? JSON.parse(saved) : mockProperties;
-  });
+export const useProperties = (params = {}) => {
+  const [properties, setProperties]   = useState([]);
+  const [pagination, setPagination]   = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
 
-  useEffect(() => {
-    localStorage.setItem("roomiematch_properties", JSON.stringify(properties));
-  }, [properties]);
+  // Serialise params so the effect re-runs when they change
+  const paramKey = JSON.stringify(params);
 
-  const addProperty = (ownerId, propData) => {
-    const newProperty = {
-      id: "p_" + Date.now(),
-      ownerId,
-      title: propData.title,
-      address: propData.address,
-      city: propData.city || "Metro City",
-      type: propData.type || "Apartment",
-      bedrooms: Number(propData.bedrooms) || 1,
-      bathrooms: Number(propData.bathrooms) || 1,
-      price: Number(propData.price) || 500,
-      deposit: Number(propData.deposit) || Number(propData.price) || 500,
-      description: propData.description || "",
-      isVerified: false, // Must be verified by admin
-      images: propData.images && propData.images.length > 0 
-        ? propData.images 
-        : ["https://lh3.googleusercontent.com/aida-public/AB6AXuCw198F3RReoAWQPDB6NBvw5ITvvjUJWnfgJ0h4eFG3yULmEEENUJT-eaYDrCdOKVlD-zLMi0WGnIVlaQhOKvcqs8lu9UcBbBH-Qe1i21rLIxCZxsvd59tEVBy6kSBNFxDMXhpJdY6rqmCtF8uQ3kFALY9GEdsaumK0Y7m5LtgKXTr63aJYRuft8TaU1PvS79p3tU2NCT402jvJrmqJjQaxpWNLjiUqcaZwwkmG1nC__PfFe0nsJVrHQEwrZ8nTT4STJg"],
-      amenities: propData.amenities || [],
-      rules: propData.rules || [],
-      availableFrom: propData.availableFrom || new Date().toISOString().split('T')[0],
-      status: "active"
-    };
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiListProperties(params);
+      setProperties(data.properties || []);
+      setPagination(data.pagination || null);
+    } catch (err) {
+      setError(err.message || "Failed to load properties.");
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramKey]);
 
-    setProperties(prev => [newProperty, ...prev]);
-    return newProperty;
+  useEffect(() => { load(); }, [load]);
+
+  // ── Create ───────────────────────────────────────────────────────────────
+  const createProperty = async (propData, imageFiles = []) => {
+    const data = await apiCreateProperty({
+      title:          propData.title,
+      address:        propData.address,
+      city:           propData.city           || "Metro City",
+      type:           propData.type           || "Apartment",
+      bedrooms:       Number(propData.bedrooms)  || 1,
+      bathrooms:      Number(propData.bathrooms) || 1,
+      price:          Number(propData.price),
+      deposit:        Number(propData.deposit)   || Number(propData.price),
+      description:    propData.description   || "",
+      available_from: propData.availableFrom || propData.available_from || null,
+      amenities:      propData.amenities     || [],
+      rules:          propData.rules         || [],
+    });
+
+    const property = data.property;
+
+    // Upload images immediately after creation
+    if (imageFiles.length > 0) {
+      try {
+        await apiUploadPropertyImages(property.id, imageFiles);
+      } catch (imgErr) {
+        console.warn("[useProperties] Image upload failed:", imgErr.message);
+      }
+    }
+
+    await load(); // Refresh list
+    return property;
   };
 
-  const editProperty = (propertyId, updatedFields) => {
+  // ── Update ───────────────────────────────────────────────────────────────
+  const editProperty = async (propertyId, updatedFields) => {
+    const data = await apiUpdateProperty(propertyId, updatedFields);
     setProperties(prev =>
-      prev.map(p => (p.id === propertyId ? { ...p, ...updatedFields } : p))
+      prev.map(p => (p.id === propertyId ? { ...p, ...data.property } : p))
     );
+    return data.property;
   };
 
-  const deleteProperty = (propertyId) => {
+  // ── Delete ───────────────────────────────────────────────────────────────
+  const deleteProperty = async (propertyId) => {
+    await apiDeleteProperty(propertyId);
     setProperties(prev => prev.filter(p => p.id !== propertyId));
   };
 
-  const verifyProperty = (propertyId) => {
+  // ── Admin: verify ────────────────────────────────────────────────────────
+  const verifyProperty = async (propertyId) => {
+    await apiVerifyProperty(propertyId);
     setProperties(prev =>
-      prev.map(p => (p.id === propertyId ? { ...p, isVerified: true } : p))
+      prev.map(p => (p.id === propertyId ? { ...p, is_verified: 1, isVerified: true } : p))
+    );
+  };
+
+  // ── Owner: status toggle ─────────────────────────────────────────────────
+  const updateStatus = async (propertyId, status) => {
+    await apiUpdatePropertyStatus(propertyId, status);
+    setProperties(prev =>
+      prev.map(p => (p.id === propertyId ? { ...p, status } : p))
     );
   };
 
   return {
     properties,
-    setProperties,
-    addProperty,
+    pagination,
+    loading,
+    error,
+    reload: load,
+    createProperty,
     editProperty,
     deleteProperty,
-    verifyProperty
+    verifyProperty,
+    updateStatus,
+    // Legacy compat aliases used by a few pages
+    addProperty: createProperty,
+    setProperties,
   };
 };

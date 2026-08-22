@@ -18,7 +18,7 @@ export const LoginPage = () => {
   const [loading, setLoading]   = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const { login, logout } = useAuth();
+  const { login, loginWithToken, logout } = useAuth();
   const navigate          = useNavigate();
 
   // ── Load Google Sign-In script ────────────────────────────────────────────
@@ -68,20 +68,19 @@ export const LoginPage = () => {
     setError("");
     setLoading(true);
 
-    setTimeout(() => {
-      const result = login(email, password);
-      setLoading(false);
-      if (result.success) {
-        if (result.user.role !== "admin") {
-          logout();
-          setError("This panel is for administrators only. Use the user app (port 5173).");
-        } else {
-          navigate("/admin/dashboard");
-        }
+    const result = await login(email, password);
+    setLoading(false);
+
+    if (result.success) {
+      if (result.user.role !== "admin") {
+        logout();
+        setError("This panel is for administrators only. Use the user app (port 5173).");
       } else {
-        setError(result.message);
+        navigate("/admin/dashboard");
       }
-    }, 600);
+    } else {
+      setError(result.message);
+    }
   };
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;

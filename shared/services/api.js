@@ -6,7 +6,7 @@
  * - Never exposes secrets or tokens in URLs.
  */
 
-const BASE_URL = "http://localhost:4000/api";
+const BASE_URL = import.meta.env?.VITE_API_URL || "http://localhost:4000/api";
 
 function getToken() {
   return localStorage.getItem("roomiematch_jwt") || null;
@@ -28,13 +28,15 @@ async function handleResponse(res) {
   return data;
 }
 
-// ── Auth ───────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────────────────────────────────────
 
-export async function apiRegister(name, email, password, role, phone) {
+export async function apiRegister(name, email, password, phone) {
   const res = await fetch(`${BASE_URL}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email, password, role, phone })
+    body: JSON.stringify({ name, email, password, phone })
   });
   return handleResponse(res);
 }
@@ -44,6 +46,13 @@ export async function apiLogin(email, password) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password })
+  });
+  return handleResponse(res);
+}
+
+export async function apiGetMe() {
+  const res = await fetch(`${BASE_URL}/auth/me`, {
+    headers: authHeaders()
   });
   return handleResponse(res);
 }
@@ -78,14 +87,78 @@ export async function apiResendOtp(pendingId) {
   return handleResponse(res);
 }
 
-export async function apiGetMe() {
-  const res = await fetch(`${BASE_URL}/auth/me`, {
+/** Request password-reset email. Always returns 200 (enumeration-safe). */
+export async function apiForgotPassword(email) {
+  const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+  return handleResponse(res);
+}
+
+/** Complete the reset with the token from the email link. */
+export async function apiResetPassword(token, email, newPassword) {
+  const res = await fetch(`${BASE_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, email, newPassword })
+  });
+  return handleResponse(res);
+}
+
+/** Change password while authenticated (requires current password). */
+export async function apiChangePassword(currentPassword, newPassword) {
+  const res = await fetch(`${BASE_URL}/auth/change-password`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ currentPassword, newPassword })
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Admin: list users with optional search/role/page filters. */
+export async function apiListUsers(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${BASE_URL}/users${qs ? "?" + qs : ""}`, {
     headers: authHeaders()
   });
   return handleResponse(res);
 }
 
-// ── Profile image ──────────────────────────────────────────────────────────
+export async function apiGetUser(userId) {
+  const res = await fetch(`${BASE_URL}/users/${userId}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+/** Update own profile (or admin updating any user). */
+export async function apiUpdateUser(userId, fields) {
+  const res = await fetch(`${BASE_URL}/users/${userId}`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(fields)
+  });
+  return handleResponse(res);
+}
+
+/** Admin: delete a user account. */
+export async function apiDeleteUser(userId) {
+  const res = await fetch(`${BASE_URL}/users/${userId}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROFILE IMAGE
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function apiUploadProfileImage(file) {
   const form = new FormData();
@@ -106,7 +179,9 @@ export async function apiDeleteProfileImage() {
   return handleResponse(res);
 }
 
-// ── Verification document ──────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// VERIFICATION DOCUMENTS
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function apiUploadVerificationDoc(file, documentType) {
   const form = new FormData();
@@ -127,9 +202,16 @@ export async function apiGetVerificationStatus() {
   return handleResponse(res);
 }
 
-/** Admin: URL for securely viewing a user's verification document. */
+/** Returns the URL for securely viewing a user's verification document (auth required). */
 export function apiVerificationDocUrl(userId) {
   return `${BASE_URL}/verification/doc/${userId}`;
+}
+
+export async function apiListPendingVerifications() {
+  const res = await fetch(`${BASE_URL}/verification/pending`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
 }
 
 export async function apiApproveVerification(userId) {
@@ -150,14 +232,73 @@ export async function apiRejectVerification(userId, reason) {
   return handleResponse(res);
 }
 
-export async function apiListPendingVerifications() {
-  const res = await fetch(`${BASE_URL}/verification/pending`, {
+// ─────────────────────────────────────────────────────────────────────────────
+// PROPERTIES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Public/authenticated property search. params: { search, city, type, minPrice, maxPrice, bedrooms, page, limit, ownerId, status, verified } */
+export async function apiListProperties(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${BASE_URL}/properties${qs ? "?" + qs : ""}`, {
     headers: authHeaders()
   });
   return handleResponse(res);
 }
 
-// ── Property images ────────────────────────────────────────────────────────
+export async function apiGetProperty(propertyId) {
+  const res = await fetch(`${BASE_URL}/properties/${propertyId}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiCreateProperty(data) {
+  const res = await fetch(`${BASE_URL}/properties`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(data)
+  });
+  return handleResponse(res);
+}
+
+export async function apiUpdateProperty(propertyId, data) {
+  const res = await fetch(`${BASE_URL}/properties/${propertyId}`, {
+    method: "PUT",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(data)
+  });
+  return handleResponse(res);
+}
+
+export async function apiDeleteProperty(propertyId) {
+  const res = await fetch(`${BASE_URL}/properties/${propertyId}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiVerifyProperty(propertyId) {
+  const res = await fetch(`${BASE_URL}/properties/${propertyId}/verify`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({})
+  });
+  return handleResponse(res);
+}
+
+export async function apiUpdatePropertyStatus(propertyId, status) {
+  const res = await fetch(`${BASE_URL}/properties/${propertyId}/status`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ status })
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROPERTY IMAGES
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function apiUploadPropertyImages(propertyId, files) {
   const form = new FormData();
@@ -188,6 +329,250 @@ export async function apiDeletePropertyImage(imageId) {
 export async function apiSetPrimaryPropertyImage(imageId) {
   const res = await fetch(`${BASE_URL}/properties/images/${imageId}/primary`, {
     method: "PATCH",
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APPLICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** params: { status, propertyId, page, limit } */
+export async function apiListApplications(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${BASE_URL}/applications${qs ? "?" + qs : ""}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiGetApplication(applicationId) {
+  const res = await fetch(`${BASE_URL}/applications/${applicationId}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiSubmitApplication(propertyId, message) {
+  const res = await fetch(`${BASE_URL}/applications`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ property_id: propertyId, message })
+  });
+  return handleResponse(res);
+}
+
+export async function apiUpdateApplicationStatus(applicationId, status) {
+  const res = await fetch(`${BASE_URL}/applications/${applicationId}/status`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ status })
+  });
+  return handleResponse(res);
+}
+
+export async function apiCancelApplication(applicationId) {
+  const res = await fetch(`${BASE_URL}/applications/${applicationId}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** params: { unread, page, limit } */
+export async function apiListNotifications(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${BASE_URL}/notifications${qs ? "?" + qs : ""}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiMarkNotificationRead(notificationId) {
+  const res = await fetch(`${BASE_URL}/notifications/${notificationId}/read`, {
+    method: "PATCH",
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiMarkAllNotificationsRead() {
+  const res = await fetch(`${BASE_URL}/notifications/read-all`, {
+    method: "PATCH",
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiDeleteNotification(notificationId) {
+  const res = await fetch(`${BASE_URL}/notifications/${notificationId}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FAVOURITES
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function apiListFavourites() {
+  const res = await fetch(`${BASE_URL}/favourites`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiAddFavourite(propertyId) {
+  const res = await fetch(`${BASE_URL}/favourites`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ property_id: propertyId })
+  });
+  return handleResponse(res);
+}
+
+export async function apiRemoveFavourite(propertyId) {
+  const res = await fetch(`${BASE_URL}/favourites/${propertyId}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiGetFavouriteStatus(propertyId) {
+  const res = await fetch(`${BASE_URL}/favourites/${propertyId}/status`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REPORTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function apiSubmitReport(data) {
+  const res = await fetch(`${BASE_URL}/reports`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(data)
+  });
+  return handleResponse(res);
+}
+
+/** Admin: params { status, page, limit } */
+export async function apiListReports(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${BASE_URL}/reports${qs ? "?" + qs : ""}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiGetReport(reportId) {
+  const res = await fetch(`${BASE_URL}/reports/${reportId}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiUpdateReport(reportId, status, resolution) {
+  const res = await fetch(`${BASE_URL}/reports/${reportId}`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ status, resolution })
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function apiGetAdminStats() {
+  const res = await fetch(`${BASE_URL}/admin/stats`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiGetAdminActivity(limit = 10) {
+  const res = await fetch(`${BASE_URL}/admin/activity?limit=${limit}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MESSAGING
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** List all conversations for the current user (includes last message + unread count). */
+export async function apiListConversations() {
+  const res = await fetch(`${BASE_URL}/messages/conversations`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Get an existing conversation or create a new one.
+ * @param {string} otherUserId
+ * @param {string|null} propertyId  — optional, links conversation to a property
+ */
+export async function apiGetOrCreateConversation(otherUserId, propertyId = null) {
+  const res = await fetch(`${BASE_URL}/messages/conversations`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ other_user_id: otherUserId, property_id: propertyId })
+  });
+  return handleResponse(res);
+}
+
+/** Get a single conversation with metadata (no messages). */
+export async function apiGetConversation(conversationId) {
+  const res = await fetch(`${BASE_URL}/messages/conversations/${conversationId}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+/** Get paginated messages inside a conversation. Also marks incoming messages as read. */
+export async function apiGetMessages(conversationId, page = 1, limit = 50) {
+  const res = await fetch(
+    `${BASE_URL}/messages/conversations/${conversationId}/messages?page=${page}&limit=${limit}`,
+    { headers: authHeaders() }
+  );
+  return handleResponse(res);
+}
+
+/** Send a message to a conversation. */
+export async function apiSendMessage(conversationId, body) {
+  const res = await fetch(`${BASE_URL}/messages/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ body })
+  });
+  return handleResponse(res);
+}
+
+/** Mark all messages in a conversation as read for the current user. */
+export async function apiMarkConversationRead(conversationId) {
+  const res = await fetch(`${BASE_URL}/messages/conversations/${conversationId}/read`, {
+    method: "PATCH",
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+/** Get total unread message count across all conversations. */
+export async function apiGetUnreadMessageCount() {
+  const res = await fetch(`${BASE_URL}/messages/unread-count`, {
     headers: authHeaders()
   });
   return handleResponse(res);

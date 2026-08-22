@@ -97,23 +97,22 @@ export const UserDetails = () => {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-4 justify-center md:justify-start text-label-md text-on-surface-variant font-semibold">
-            {user.role === "tenant" ? (
+            {user.role === "user" ? (
               <>
-                <div className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-primary text-[18px]">school</span>
-                  <span>{user.university}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-primary text-[18px]">menu_book</span>
-                  <span>{user.major}</span>
-                </div>
+                {user.university && (
+                  <div className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-primary text-[18px]">school</span>
+                    <span>{user.university}</span>
+                  </div>
+                )}
+                {user.major && (
+                  <div className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-primary text-[18px]">menu_book</span>
+                    <span>{user.major}</span>
+                  </div>
+                )}
               </>
-            ) : (
-              <div className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-primary text-[18px]">domain</span>
-                <span>{user.company || "Independent landlord"}</span>
-              </div>
-            )}
+            ) : null}
             <div className="flex items-center gap-1">
               <span className="material-symbols-outlined text-primary text-[18px]">phone</span>
               <span>{user.phone || "No phone listed"}</span>

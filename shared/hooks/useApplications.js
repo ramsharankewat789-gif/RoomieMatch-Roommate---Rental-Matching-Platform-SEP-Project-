@@ -1,122 +1,105 @@
-import { useState, useEffect, useContext } from "react";
-import { mockApplications } from "../data/mockApplications";
-import { NotificationContext } from "../context/NotificationContext";
+/**
+ * useApplications.js — Real API hook for rental applications.
+ *
+ * Replaces the localStorage/mockApplications implementation.
+ * All data comes from /api/applications endpoints.
+ *
+ * Usage:
+ *   const { applications, loading, error, reload,
+ *           applyForProperty, updateApplicationStatus, cancelApplication }
+ *     = useApplications(params);
+ *
+ * params — optional query object forwarded to GET /api/applications
+ *   e.g. { status, propertyId, page, limit }
+ */
+import { useState, useEffect, useCallback } from "react";
+import {
+  apiListApplications,
+  apiSubmitApplication,
+  apiUpdateApplicationStatus,
+  apiCancelApplication,
+} from "../services/api";
 
-export const useApplications = () => {
-  const { addNotification } = useContext(NotificationContext);
-  const [applications, setApplications] = useState(() => {
-    const saved = localStorage.getItem("roomiematch_applications");
-    return saved ? JSON.parse(saved) : mockApplications;
-  });
+export const useApplications = (params = {}) => {
+  const [applications, setApplications] = useState([]);
+  const [pagination, setPagination]     = useState(null);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState(null);
 
-  useEffect(() => {
-    localStorage.setItem("roomiematch_applications", JSON.stringify(applications));
-  }, [applications]);
+  const paramKey = JSON.stringify(params);
 
-  const applyForProperty = (tenantId, tenantName, propertyId, propertyTitle, ownerId, messageText) => {
-    // Check if tenant already has a pending application for this property
-    const existing = applications.find(a => a.propertyId === propertyId && a.tenantId === tenantId && a.status === "pending");
-    if (existing) {
-      return { success: false, message: "You already have a pending application for this property." };
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiListApplications(params);
+      setApplications(data.applications || []);
+      setPagination(data.pagination     || null);
+    } catch (err) {
+      // If user is not logged in the request will 401 — swallow gracefully
+      if (!err.message?.includes("401") && !err.message?.includes("Authentication")) {
+        setError(err.message || "Failed to load applications.");
+      }
+      setApplications([]);
+    } finally {
+      setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramKey]);
 
-    const newApp = {
-      id: "a_" + Date.now(),
-      propertyId,
-      tenantId,
-      ownerId,
-      status: "pending",
-      appliedAt: new Date().toISOString(),
-      message: messageText || "Hi, I am interested in renting this property.",
-      history: [
-        { status: "submitted", date: new Date().toISOString(), label: `Application submitted by ${tenantName}` }
-      ]
-    };
+  useEffect(() => { load(); }, [load]);
 
-    setApplications(prev => [newApp, ...prev]);
-
-    // Notify owner
-    addNotification(
-      ownerId,
-      "New Application Received",
-      `${tenantName} applied for your property: "${propertyTitle}"`,
-      "application",
-      newApp.id
-    );
-
-    return { success: true, application: newApp };
-  };
-
-  const updateApplicationStatus = (appId, newStatus, actorName) => {
-    let tenantId = "";
-    let propertyTitle = "your listing";
-
-    setApplications(prev =>
-      prev.map(app => {
-        if (app.id === appId) {
-          tenantId = app.tenantId;
-          const newHistory = [
-            ...app.history,
-            {
-              status: newStatus,
-              date: new Date().toISOString(),
-              label: `Application status updated to ${newStatus} by ${actorName}`
-            }
-          ];
-
-          return { ...app, status: newStatus, history: newHistory };
-        }
-        return app;
-      })
-    );
-
-    // Notify tenant of update
-    if (tenantId) {
-      addNotification(
-        tenantId,
-        `Application ${newStatus.toUpperCase()}`,
-        `Your application for property was ${newStatus} by the landlord.`,
-        "application",
-        appId
-      );
+  // ── Submit / apply ────────────────────────────────────────────────────────
+  /**
+   * applyForProperty(propertyId, message)
+   * Returns { success: true, application } or { success: false, message }
+   */
+  const applyForProperty = async (propertyId, message = "") => {
+    try {
+      const data = await apiSubmitApplication(propertyId, message);
+      await load(); // Refresh list so the new application appears
+      return { success: true, application: data.application };
+    } catch (err) {
+      return { success: false, message: err.message || "Failed to submit application." };
     }
   };
 
-  const cancelApplication = (appId, tenantName) => {
-    let ownerId = "";
-    setApplications(prev =>
-      prev.map(app => {
-        if (app.id === appId) {
-          ownerId = app.ownerId;
-          return {
-            ...app,
-            status: "cancelled",
-            history: [
-              ...app.history,
-              { status: "cancelled", date: new Date().toISOString(), label: "Application cancelled by tenant" }
-            ]
-          };
-        }
-        return app;
-      })
-    );
-
-    if (ownerId) {
-      addNotification(
-        ownerId,
-        "Application Cancelled",
-        `${tenantName} has cancelled their application.`,
-        "application",
-        appId
+  // ── Owner: approve / reject ────────────────────────────────────────────
+  const updateApplicationStatus = async (applicationId, status) => {
+    try {
+      const data = await apiUpdateApplicationStatus(applicationId, status);
+      setApplications(prev =>
+        prev.map(a => (a.id === applicationId ? { ...a, status: data.application.status } : a))
       );
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  // ── Tenant: cancel ────────────────────────────────────────────────────────
+  const cancelApplication = async (applicationId) => {
+    try {
+      await apiCancelApplication(applicationId);
+      setApplications(prev =>
+        prev.map(a => (a.id === applicationId ? { ...a, status: "cancelled" } : a))
+      );
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message };
     }
   };
 
   return {
     applications,
-    setApplications,
+    pagination,
+    loading,
+    error,
+    reload: load,
     applyForProperty,
     updateApplicationStatus,
-    cancelApplication
+    cancelApplication,
+    // Legacy compat alias
+    setApplications,
   };
 };

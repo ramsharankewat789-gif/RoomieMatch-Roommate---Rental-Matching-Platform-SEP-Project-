@@ -1,11 +1,11 @@
 /**
  * authController.js — Email/password auth + Google OAuth + OTP handlers.
  */
-const bcrypt      = require("bcryptjs");
-const jwt         = require("jsonwebtoken");
+const bcrypt  = require("bcryptjs");
+const jwt     = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const { OAuth2Client } = require("google-auth-library");
-const { run, get, all } = require("../database/db");
+const { run, get, all, execute } = require("../database/db");
 const { createOtp, verifyOtp, canResend } = require("../services/otpService");
 const { sendOtpEmail } = require("../services/emailService");
 
@@ -21,12 +21,57 @@ function signToken(userId) {
   );
 }
 
+/**
+ * sanitizeUser — strips sensitive fields and enriches with preferences/hobbies.
+ * MySQL returns DATETIME as JS Date objects — convert to ISO strings for JSON responses.
+ */
 function sanitizeUser(user) {
-  // Strip sensitive fields before sending to client
-  const { password_hash, ...safe } = user;
-  // Parse JSON fields stored as strings
-  try { safe.hobbies     = JSON.parse(safe.hobbies     || "[]"); } catch { safe.hobbies = []; }
-  try { safe.preferences = JSON.parse(safe.preferences || "{}"); } catch { safe.preferences = {}; }
+  if (!user) return null;
+  const {
+    password_hash,
+    ...safe
+  } = user;
+
+  // Convert Date objects to ISO strings
+  if (safe.created_at instanceof Date) safe.created_at = safe.created_at.toISOString();
+  if (safe.updated_at instanceof Date) safe.updated_at = safe.updated_at.toISOString();
+
+  return safe;
+}
+
+/**
+ * buildUserResponse — fetches the full user + preferences + hobbies
+ * from their respective normalized tables and returns a combined object.
+ */
+async function buildUserResponse(userId) {
+  const user = await get("SELECT * FROM users WHERE id = ?", [userId]);
+  if (!user) return null;
+
+  // Fetch preferences
+  const prefs = await get(
+    "SELECT smoke, pet, cleanliness, sleep_schedule, social_life, cooking FROM user_preferences WHERE user_id = ?",
+    [userId]
+  );
+
+  // Fetch hobbies
+  const hobbyRows = await all(
+    "SELECT hobby FROM user_hobbies WHERE user_id = ? ORDER BY id ASC",
+    [userId]
+  );
+
+  const safe = sanitizeUser(user);
+  safe.preferences = prefs
+    ? {
+        smoke:   prefs.smoke,
+        pet:     prefs.pet,
+        clean:   prefs.cleanliness,
+        sleep:   prefs.sleep_schedule,
+        social:  prefs.social_life,
+        cooking: prefs.cooking
+      }
+    : {};
+  safe.hobbies = hobbyRows.map(r => r.hobby);
+
   return safe;
 }
 
@@ -34,7 +79,7 @@ function sanitizeUser(user) {
 
 async function register(req, res) {
   try {
-    const { name, email, password, role, phone } = req.body;
+    const { name, email, password, phone } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: "Name, email, and password are required." });
@@ -43,29 +88,34 @@ async function register(req, res) {
       return res.status(400).json({ error: "Password must be at least 6 characters." });
     }
 
-    // Validate allowed roles
-    const allowedRoles = ["user", "tenant", "owner"];
-    const assignedRole = allowedRoles.includes(role) ? "user" : "user"; // always 'user' for self-registration
+    const emailLower = email.toLowerCase().trim();
 
-    const existing = await get("SELECT id FROM users WHERE email = ?", [email.toLowerCase()]);
+    // Check duplicate
+    const existing = await get("SELECT id FROM users WHERE email = ?", [emailLower]);
     if (existing) {
       return res.status(409).json({ error: "An account with this email already exists." });
     }
 
     const salt         = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
-    const userId       = "u_" + uuidv4().replace(/-/g, "").substring(0, 16);
+    const userId       = uuidv4();
 
     await run(
-      `INSERT INTO users (id, name, email, password_hash, role, phone, is_verified)
-       VALUES (?, ?, ?, ?, ?, ?, 0)`,
-      [userId, name, email.toLowerCase(), passwordHash, assignedRole, phone || ""]
+      `INSERT INTO users (id, name, email, password_hash, role, phone, is_verified, email_verified)
+       VALUES (?, ?, ?, ?, 'user', ?, 0, 0)`,
+      [userId, name.trim(), emailLower, passwordHash, phone ? phone.trim() : null]
     );
 
-    const user  = await get("SELECT * FROM users WHERE id = ?", [userId]);
+    // Create default preferences row
+    await run(
+      "INSERT IGNORE INTO user_preferences (user_id) VALUES (?)",
+      [userId]
+    );
+
+    const user  = await buildUserResponse(userId);
     const token = signToken(userId);
 
-    return res.status(201).json({ token, user: sanitizeUser(user) });
+    return res.status(201).json({ token, user });
   } catch (err) {
     console.error("[Register]", err.message);
     return res.status(500).json({ error: "Registration failed. Please try again." });
@@ -82,7 +132,7 @@ async function login(req, res) {
       return res.status(400).json({ error: "Email and password are required." });
     }
 
-    const user = await get("SELECT * FROM users WHERE email = ?", [email.toLowerCase()]);
+    const user = await get("SELECT * FROM users WHERE email = ?", [email.toLowerCase().trim()]);
     if (!user || !user.password_hash) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
@@ -92,25 +142,27 @@ async function login(req, res) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
-    const token = signToken(user.id);
-    return res.json({ token, user: sanitizeUser(user) });
+    const fullUser = await buildUserResponse(user.id);
+    const token    = signToken(user.id);
+
+    return res.json({ token, user: fullUser });
   } catch (err) {
     console.error("[Login]", err.message);
     return res.status(500).json({ error: "Login failed. Please try again." });
   }
 }
 
-// ── Google OAuth — Initiate ────────────────────────────────────────────────
+// ── Google OAuth ───────────────────────────────────────────────────────────
 
 async function googleAuthCallback(req, res) {
   try {
-    const { credential } = req.body; // Google One Tap / Sign-In button sends an ID token
+    const { credential } = req.body;
 
     if (!credential) {
       return res.status(400).json({ error: "Google credential is required." });
     }
 
-    // ── Server-side validation — NEVER trust the frontend ─────────────────
+    // Server-side validation — NEVER trust frontend-supplied email
     const ticket = await googleClient.verifyIdToken({
       idToken:  credential,
       audience: process.env.GOOGLE_CLIENT_ID
@@ -118,59 +170,56 @@ async function googleAuthCallback(req, res) {
 
     const payload = ticket.getPayload();
 
-    // Confirm Google itself says the email is verified
     if (!payload.email_verified) {
-      return res.status(401).json({ error: "Google account email is not verified. Please verify your Gmail first." });
+      return res.status(401).json({
+        error: "Google account email is not verified. Please verify your Gmail first."
+      });
     }
 
-    const googleId = payload.sub;    // stable Google identifier
+    const googleId = payload.sub;   // stable, permanent Google identifier
     const email    = payload.email;
     const name     = payload.name || email.split("@")[0];
     const picture  = payload.picture || null;
 
-    // ── Find existing user by Google ID first, then by email ──────────────
-    let user = await get("SELECT * FROM users WHERE google_id = ?", [googleId]);
+    // Find existing user — prefer google_id match, then email match
+    let user = await get("SELECT id, role FROM users WHERE google_id = ?", [googleId]);
     if (!user) {
-      user = await get("SELECT * FROM users WHERE email = ?", [email.toLowerCase()]);
+      user = await get("SELECT id, role FROM users WHERE email = ?", [email.toLowerCase()]);
       if (user) {
-        // Link existing email/password account to Google
+        // Link Google ID to existing email/password account
         await run("UPDATE users SET google_id = ? WHERE id = ?", [googleId, user.id]);
-        user = await get("SELECT * FROM users WHERE id = ?", [user.id]);
       }
     }
 
-    // If user is admin, Google auth requires admin role check
-    if (user && user.role === "admin") {
-      // Generate OTP and send — admin still needs OTP
-    }
+    // Store pending Google auth session (cleaned up after OTP verification)
+    const pendingId = uuidv4();
 
-    // ── Store pending Google auth for OTP step ────────────────────────────
-    const pendingId  = uuidv4();
-    const expiresAt  = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min window
-    const isNewUser  = !user;
-
-    // Cleanup old pending entries for this google_id
-    await run("DELETE FROM google_auth_pending WHERE email = ?", [email]);
+    // MySQL: ON DUPLICATE KEY UPDATE to handle repeated sign-in attempts
     await run(
       `INSERT INTO google_auth_pending (id, google_id, email, name, picture_url, email_verified, expires_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?)`,
-      [pendingId, googleId, email, name, picture, expiresAt]
+       VALUES (?, ?, ?, ?, ?, 1, DATE_ADD(NOW(), INTERVAL 10 MINUTE))
+       ON DUPLICATE KEY UPDATE
+         id = VALUES(id),
+         name = VALUES(name),
+         picture_url = VALUES(picture_url),
+         expires_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE)`,
+      [pendingId, googleId, email, name, picture]
     );
 
-    // ── Generate OTP and send to Gmail ────────────────────────────────────
+    // Generate OTP and send to Google-verified Gmail address
     const userId = user ? user.id : null;
     const otp    = await createOtp(userId, email);
     await sendOtpEmail(email, otp);
-    // otp is NOT returned in the response
+    // otp is NOT returned in response
 
     return res.json({
       pendingId,
-      email,             // returned so frontend can show masked email
-      isNewUser,
-      message: `Verification code sent to your Gmail.`
+      email,       // returned so frontend can show masked version
+      isNewUser: !user,
+      message: "Verification code sent to your Gmail."
     });
   } catch (err) {
-    if (err.message && err.message.includes("Token used too late")) {
+    if (err.message?.includes("Token used too late")) {
       return res.status(401).json({ error: "Google sign-in expired. Please try again." });
     }
     console.error("[GoogleAuth]", err.message);
@@ -188,9 +237,9 @@ async function verifyGoogleOtp(req, res) {
       return res.status(400).json({ error: "Pending ID and OTP are required." });
     }
 
-    // Retrieve pending Google auth
+    // MySQL: compare DATETIME column with NOW()
     const pending = await get(
-      "SELECT * FROM google_auth_pending WHERE id = ? AND expires_at > datetime('now')",
+      "SELECT * FROM google_auth_pending WHERE id = ? AND expires_at > NOW()",
       [pendingId]
     );
     if (!pending) {
@@ -203,34 +252,40 @@ async function verifyGoogleOtp(req, res) {
       return res.status(400).json({ error: result.error, attemptsLeft: result.attemptsLeft });
     }
 
-    // Cleanup pending entry
+    // Clean up pending session
     await run("DELETE FROM google_auth_pending WHERE id = ?", [pendingId]);
 
     // Find or create user
-    let user = await get("SELECT * FROM users WHERE google_id = ?", [pending.google_id]);
+    let user = await get("SELECT id FROM users WHERE google_id = ?", [pending.google_id]);
     if (!user) {
-      user = await get("SELECT * FROM users WHERE email = ?", [pending.email.toLowerCase()]);
+      user = await get("SELECT id FROM users WHERE email = ?", [pending.email.toLowerCase()]);
     }
 
+    let isNewUser = false;
     if (!user) {
-      // New user — create account
-      const newId = "u_" + uuidv4().replace(/-/g, "").substring(0, 16);
+      // New account — created via Google
+      isNewUser     = true;
+      const newId   = uuidv4();
       await run(
-        `INSERT INTO users (id, name, email, role, google_id, profile_image, is_verified)
-         VALUES (?, ?, ?, 'user', ?, ?, 1)`,
+        `INSERT INTO users (id, name, email, role, google_id, profile_image, is_verified, email_verified)
+         VALUES (?, ?, ?, 'user', ?, ?, 1, 1)`,
         [newId, pending.name || pending.email, pending.email.toLowerCase(), pending.google_id, pending.picture_url]
       );
-      user = await get("SELECT * FROM users WHERE id = ?", [newId]);
+      // Create default preferences
+      await run("INSERT IGNORE INTO user_preferences (user_id) VALUES (?)", [newId]);
+      user = { id: newId };
     } else {
-      // Existing user — link Google ID if not already linked
-      if (!user.google_id) {
-        await run("UPDATE users SET google_id = ? WHERE id = ?", [pending.google_id, user.id]);
-      }
-      user = await get("SELECT * FROM users WHERE id = ?", [user.id]);
+      // Link google_id if not already linked
+      await run(
+        "UPDATE users SET google_id = COALESCE(google_id, ?), email_verified = 1 WHERE id = ?",
+        [pending.google_id, user.id]
+      );
     }
 
-    const token = signToken(user.id);
-    return res.json({ token, user: sanitizeUser(user), isNewUser: result.userId === null });
+    const fullUser = await buildUserResponse(user.id);
+    const token    = signToken(user.id);
+
+    return res.json({ token, user: fullUser, isNewUser });
   } catch (err) {
     console.error("[VerifyGoogleOtp]", err.message);
     return res.status(500).json({ error: "OTP verification failed. Please try again." });
@@ -248,14 +303,14 @@ async function resendOtp(req, res) {
     }
 
     const pending = await get(
-      "SELECT * FROM google_auth_pending WHERE id = ? AND expires_at > datetime('now')",
+      "SELECT * FROM google_auth_pending WHERE id = ? AND expires_at > NOW()",
       [pendingId]
     );
     if (!pending) {
       return res.status(400).json({ error: "Session expired. Please sign in with Google again." });
     }
 
-    // Check cooldown
+    // Enforce resend cooldown
     const { allowed, secondsLeft } = await canResend(pending.email);
     if (!allowed) {
       return res.status(429).json({
@@ -264,8 +319,8 @@ async function resendOtp(req, res) {
       });
     }
 
-    const user   = await get("SELECT id FROM users WHERE email = ?", [pending.email.toLowerCase()]);
-    const otp    = await createOtp(user ? user.id : null, pending.email);
+    const user = await get("SELECT id FROM users WHERE email = ?", [pending.email.toLowerCase()]);
+    const otp  = await createOtp(user ? user.id : null, pending.email);
     await sendOtpEmail(pending.email, otp);
 
     return res.json({ message: "Verification code resent." });
@@ -275,16 +330,24 @@ async function resendOtp(req, res) {
   }
 }
 
-// ── Get current user (from JWT) ───────────────────────────────────────────
+// ── Get current authenticated user ───────────────────────────────────────
 
 async function getMe(req, res) {
   try {
-    const user = await get("SELECT * FROM users WHERE id = ?", [req.user.id]);
+    const user = await buildUserResponse(req.user.id);
     if (!user) return res.status(404).json({ error: "User not found." });
-    return res.json({ user: sanitizeUser(user) });
+    return res.json({ user });
   } catch (err) {
+    console.error("[GetMe]", err.message);
     return res.status(500).json({ error: "Failed to fetch user." });
   }
 }
 
-module.exports = { register, login, googleAuthCallback, verifyGoogleOtp, resendOtp, getMe };
+module.exports = {
+  register,
+  login,
+  googleAuthCallback,
+  verifyGoogleOtp,
+  resendOtp,
+  getMe
+};

@@ -1,22 +1,20 @@
 /**
  * RegisterPage.jsx
  *
- * Registration with optional profile image upload.
- * Profile image ≠ identity verification — uploading a photo never affects
- * verification status. These are separate systems.
+ * Unified registration — one account type for all users.
+ * Every user can both search for properties AND list their own.
+ * Optional profile image upload (separate from identity verification).
  */
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@shared/hooks/useAuth";
 import { apiUploadProfileImage } from "@shared/services/api";
-import { SingleImageUpload } from "@shared/components/common/ImageUpload";
 
 export const RegisterPage = () => {
   const [name, setName]                   = useState("");
   const [email, setEmail]                 = useState("");
   const [password, setPassword]           = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole]                   = useState("tenant");
   const [phone, setPhone]                 = useState("");
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [profilePreview, setProfilePreview]     = useState(null);
@@ -24,7 +22,7 @@ export const RegisterPage = () => {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { register } = useAuth();
+  const { register, setCurrentUser } = useAuth();
   const navigate      = useNavigate();
 
   // Preview selected image locally (no upload yet — happens after registration)
@@ -51,39 +49,29 @@ export const RegisterPage = () => {
 
     setLoading(true);
 
-    // 1. Register via existing localStorage-based AuthContext
-    const result = register({ name, email, password, role, phone });
+    // 1. Register via real backend API
+    const result = await register({ name, email, password, phone });
     if (!result.success) {
       setLoading(false);
       setError(result.message);
       return;
     }
 
-    // 2. If a profile image was selected, upload it to backend
-    //    This does NOT affect verification status — profile image is separate
+    // 2. If a profile image was selected, upload it (JWT is now set by register)
     if (profileImageFile) {
       try {
-        // Store JWT from registration if available (for real-backend flow)
         const data = await apiUploadProfileImage(profileImageFile);
-        // Update local user's avatar with the returned URL
         if (data.imageUrl) {
-          // Persist into localStorage user object
-          const stored = localStorage.getItem("roomiematch_currentUser");
-          if (stored) {
-            const user = JSON.parse(stored);
-            user.avatar = `http://localhost:4000${data.imageUrl}`;
-            localStorage.setItem("roomiematch_currentUser", JSON.stringify(user));
-          }
+          // Update the current user's avatar in context
+          setCurrentUser(prev => prev ? { ...prev, avatar: `http://localhost:4000${data.imageUrl}` } : prev);
         }
       } catch {
-        // Non-fatal — profile image upload failure doesn't block registration
         console.warn("Profile image upload failed — continuing without it");
       }
     }
 
     setSuccess("Registration successful! Redirecting...");
     setLoading(false);
-
     setTimeout(() => navigate("/user/dashboard"), 1200);
   };
 
@@ -184,25 +172,6 @@ export const RegisterPage = () => {
               placeholder="+1 (555) 012-3456"
               className="w-full px-4 py-2.5 border border-outline-variant rounded-lg bg-surface-container-lowest text-on-surface placeholder:text-outline-variant focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none"
             />
-          </div>
-
-          {/* Role */}
-          <div className="space-y-1">
-            <label className="block font-label-md text-label-md text-on-surface">Account Type</label>
-            <div className="grid grid-cols-2 gap-4">
-              {[["tenant", "Tenant / Student"], ["owner", "Owner / Landlord"]].map(([val, label]) => (
-                <button
-                  key={val} type="button" onClick={() => setRole(val)}
-                  className={`py-3 px-4 rounded-lg border text-center font-bold text-label-md transition-all duration-200 ${
-                    role === val
-                      ? "bg-primary-container text-on-primary-container border-primary"
-                      : "bg-surface-container-lowest text-on-surface-variant border-outline-variant hover:bg-surface-container-low"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Password */}

@@ -1,25 +1,62 @@
-import React, { useContext } from "react";
-import { AuthContext } from "@shared/context/AuthContext";
-import { useProperties } from "@shared/hooks/useProperties";
-import { useApplications } from "@shared/hooks/useApplications";
+/**
+ * Analytics.jsx (Admin)
+ *
+ * Reads live metrics from GET /api/admin/stats.
+ * No mock data. No AuthContext.users or useProperties hooks.
+ */
+import React, { useState, useEffect } from "react";
+import { apiGetAdminStats } from "@shared/services/api";
 
 export const Analytics = () => {
-  const { users } = useContext(AuthContext);
-  const { properties } = useProperties();
-  const { applications } = useApplications();
+  const [stats, setStats]   = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState("");
 
-  const totalUsers = users.length;
-  const tenantsCount = users.filter((u) => u.role === "tenant").length;
-  const ownersCount = users.filter((u) => u.role === "owner").length;
-  const verifiedUsers = users.filter((u) => u.isVerified).length;
+  useEffect(() => {
+    apiGetAdminStats()
+      .then(setStats)
+      .catch(err => setError(err.message || "Failed to load stats."))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const totalProperties = properties.length;
-  const activeProperties = properties.filter((p) => p.status === "active").length;
-  const verifiedProperties = properties.filter((p) => p.isVerified).length;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-on-surface-variant gap-3">
+        <span className="material-symbols-outlined text-[24px] animate-spin">progress_activity</span>
+        Loading analytics...
+      </div>
+    );
+  }
 
-  const totalApps = applications.length;
-  const approvedApps = applications.filter((a) => a.status === "approved").length;
-  const pendingApps = applications.filter((a) => a.status === "pending").length;
+  if (error) {
+    return (
+      <div className="bg-error-container/20 border border-error/40 text-error p-4 rounded-xl text-sm flex items-center gap-2">
+        <span className="material-symbols-outlined text-sm">warning</span>
+        {error}
+      </div>
+    );
+  }
+
+  const totalUsers       = stats?.users?.total           || 0;
+  const tenantCount      = stats?.users?.tenants         || 0;
+  const ownerCount       = stats?.users?.owners          || 0;
+  const newUsersMonth    = stats?.users?.newThisMonth    || 0;
+
+  const totalProperties  = stats?.properties?.total      || 0;
+  const activeProperties = stats?.properties?.active     || 0;
+  const newPropsMonth    = stats?.properties?.newThisMonth || 0;
+
+  const totalApps        = stats?.applications?.approvedThisMonth || 0;
+  const pendingApps      = stats?.applications?.pending  || 0;
+  const approvedThisMonth = stats?.applications?.approvedThisMonth || 0;
+
+  const pendingVerifs    = stats?.verifications?.pending || 0;
+  const pendingReports   = stats?.reports?.pending       || 0;
+  const totalMessages    = stats?.messages?.total        || 0;
+  const monthlyRent      = stats?.revenue?.totalRentedMonthly || 0;
+
+  const verifRate = totalUsers > 0 ? Math.round(((totalUsers - pendingVerifs) / totalUsers) * 100) : 0;
+  const propVerifRate = totalProperties > 0 ? Math.round((activeProperties / totalProperties) * 100) : 0;
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
@@ -30,105 +67,77 @@ export const Analytics = () => {
         </p>
       </div>
 
-      {/* Numerical Metrics Summary */}
+      {/* Summary Cards */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        {/* Users */}
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
           <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">User Registrations</h2>
           <div className="space-y-2 text-body-md text-on-surface-variant">
-            <div className="flex justify-between">
-              <span>Total Members</span>
-              <span className="font-bold text-on-surface">{totalUsers}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Student Tenants</span>
-              <span className="font-bold text-on-surface">{tenantsCount}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Registered Landlords</span>
-              <span className="font-bold text-on-surface">{ownersCount}</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t">
+            <StatRow label="Total Members"        value={totalUsers} />
+            <StatRow label="Student Tenants"      value={tenantCount} />
+            <StatRow label="Registered Landlords" value={ownerCount} />
+            <StatRow label="New This Month"       value={newUsersMonth} />
+            <div className="flex justify-between pt-2 border-t border-outline-variant/60">
               <span>Verification Rate</span>
-              <span className="font-bold text-secondary">
-                {Math.round((verifiedUsers / (totalUsers || 1)) * 100)}%
-              </span>
+              <span className="font-bold text-secondary">{verifRate}%</span>
             </div>
           </div>
         </div>
 
+        {/* Properties */}
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
           <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Listings Performance</h2>
           <div className="space-y-2 text-body-md text-on-surface-variant">
-            <div className="flex justify-between">
-              <span>Total Listings</span>
-              <span className="font-bold text-on-surface">{totalProperties}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Active Listings</span>
-              <span className="font-bold text-on-surface">{activeProperties}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Verified Properties</span>
-              <span className="font-bold text-on-surface">{verifiedProperties}</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t">
-              <span>Verification Rate</span>
-              <span className="font-bold text-secondary">
-                {Math.round((verifiedProperties / (totalProperties || 1)) * 100)}%
-              </span>
+            <StatRow label="Total Listings"    value={totalProperties} />
+            <StatRow label="Active Listings"   value={activeProperties} />
+            <StatRow label="New This Month"    value={newPropsMonth} />
+            <StatRow label="Pending Review"    value={pendingVerifs} />
+            <div className="flex justify-between pt-2 border-t border-outline-variant/60">
+              <span>Active Rate</span>
+              <span className="font-bold text-secondary">{propVerifRate}%</span>
             </div>
           </div>
         </div>
 
+        {/* Applications */}
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
-          <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Application funnel</h2>
+          <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Application Funnel</h2>
           <div className="space-y-2 text-body-md text-on-surface-variant">
-            <div className="flex justify-between">
-              <span>Applications Submitted</span>
-              <span className="font-bold text-on-surface">{totalApps}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Approved Applications</span>
-              <span className="font-bold text-on-surface">{approvedApps}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Pending Reviews</span>
-              <span className="font-bold text-on-surface">{pendingApps}</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t">
-              <span>Lease Conversion Rate</span>
-              <span className="font-bold text-secondary">
-                {Math.round((approvedApps / (totalApps || 1)) * 100)}%
-              </span>
+            <StatRow label="Pending Applications"    value={pendingApps} />
+            <StatRow label="Approved This Month"     value={approvedThisMonth} />
+            <StatRow label="Total Messages Sent"     value={totalMessages} />
+            <StatRow label="Active Reports"          value={pendingReports} />
+            <div className="flex justify-between pt-2 border-t border-outline-variant/60">
+              <span>Est. Monthly Rent Value</span>
+              <span className="font-bold text-secondary">${monthlyRent.toLocaleString()}</span>
             </div>
           </div>
         </div>
+
       </section>
 
-      {/* Visual representation of data distributions */}
+      {/* Bar Chart — new users per month (static shape, real totals as reference) */}
       <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-6">
-        <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Growth Trends</h2>
-        <div className="h-64 flex items-end gap-3 justify-between px-6 pt-6 border-b border-l border-outline-variant">
-          {/* Mock Bar chart */}
+        <div className="flex justify-between items-center">
+          <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Platform Growth</h2>
+          <span className="text-xs text-on-surface-variant font-semibold bg-surface-container px-3 py-1 rounded-full border border-outline-variant">
+            {totalUsers} total registered members
+          </span>
+        </div>
+
+        {/* Summary metric row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { month: "Jan", val: 30 },
-            { month: "Feb", val: 45 },
-            { month: "Mar", val: 60 },
-            { month: "Apr", val: 55 },
-            { month: "May", val: 80 },
-            { month: "Jun", val: 95 },
-            { month: "Jul", val: 120 },
-            { month: "Aug", val: 150 }
-          ].map((bar, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-              <span className="text-[10px] font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                {bar.val} users
-              </span>
-              <div
-                className="w-full bg-primary-container hover:bg-primary transition-colors rounded-t-md"
-                style={{ height: `${(bar.val / 150) * 160}px` }}
-              ></div>
-              <span className="text-xs font-semibold text-outline-variant mt-2">{bar.month}</span>
+            { label: "Users",        value: totalUsers,       icon: "group" },
+            { label: "Properties",   value: totalProperties,  icon: "home_work" },
+            { label: "Applications", value: pendingApps,      icon: "description" },
+            { label: "Monthly Rent", value: `$${monthlyRent.toLocaleString()}`, icon: "payments" },
+          ].map(({ label, value, icon }) => (
+            <div key={label} className="bg-surface-container-low p-4 rounded-xl border border-outline-variant text-center">
+              <span className="material-symbols-outlined text-[28px] text-primary mb-2 block">{icon}</span>
+              <p className="font-headline-sm text-headline-sm text-on-surface font-bold">{value}</p>
+              <p className="text-xs text-on-surface-variant font-semibold mt-0.5">{label}</p>
             </div>
           ))}
         </div>
@@ -136,5 +145,14 @@ export const Analytics = () => {
     </div>
   );
 };
+
+function StatRow({ label, value }) {
+  return (
+    <div className="flex justify-between">
+      <span>{label}</span>
+      <span className="font-bold text-on-surface">{value}</span>
+    </div>
+  );
+}
 
 export default Analytics;

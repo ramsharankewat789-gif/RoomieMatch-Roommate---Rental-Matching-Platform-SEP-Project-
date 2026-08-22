@@ -5,9 +5,9 @@ import { mockRoommates } from "../data/mockRoommates";
 export const useRoommates = () => {
   const { users, currentUser } = useContext(AuthContext);
 
-  // Return all tenant users except the active user
+  // Return all regular users except the active user
   const candidates = users.filter(
-    user => user.role === "tenant" && user.id !== currentUser?.id
+    user => user.role === "user" && user.id !== currentUser?.id
   );
 
   // Compute or retrieve precomputed compatibility

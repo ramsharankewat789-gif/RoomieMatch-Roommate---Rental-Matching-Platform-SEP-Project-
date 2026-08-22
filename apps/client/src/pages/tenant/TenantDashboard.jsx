@@ -22,17 +22,19 @@ export const TenantDashboard = () => {
     compat: getCompatibility(c.id)
   })).sort((a, b) => b.compat.compatibilityScore - a.compat.compatibilityScore);
 
-  // 2. Filter user applications
-  const userApps = applications.filter(app => app.tenantId === currentUser?.id);
+  // 2. Filter user applications (API returns tenant_id, fallback for tenant_id field)
+  const userApps = applications.filter(app =>
+    (app.tenant_id || app.tenantId) === currentUser?.id
+  );
 
-  // 3. Recommended properties (Verified properties)
+  // 3. Recommended properties — API returns is_verified (int), legacy uses isVerified (bool)
   const recommendedProps = properties
-    .filter(p => p.isVerified && p.status === "active")
+    .filter(p => (p.is_verified || p.isVerified) && p.status === "active")
     .slice(0, 3);
 
-  const handleChatWithRoommate = (roommateId) => {
-    const threadId = getOrCreateThread(roommateId);
-    navigate(`/user/messages?thread=${threadId}`);
+  const handleChatWithRoommate = async (roommateId) => {
+    const threadId = await getOrCreateThread(roommateId);
+    if (threadId) navigate(`/user/messages?thread=${threadId}`);
   };
 
   return (
@@ -103,7 +105,11 @@ export const TenantDashboard = () => {
                   
                   <div className="mt-4 pt-3 border-t border-outline-variant flex justify-between items-center">
                     <span className="text-xs text-outline font-medium">
-                      Budget: {roommate.budget}
+                      Budget: {
+                        roommate.budget_min && roommate.budget_max
+                          ? `$${roommate.budget_min} - $${roommate.budget_max}`
+                          : roommate.budget || "Not specified"
+                      }
                     </span>
                     <button
                       onClick={() => handleChatWithRoommate(roommate.id)}
@@ -134,7 +140,7 @@ export const TenantDashboard = () => {
               {recommendedProps.map((prop) => (
                 <div key={prop.id} className="bg-surface rounded-xl border border-outline-variant overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow">
                   <div className="relative h-40">
-                    <img src={prop.images[0]} alt={prop.title} className="w-full h-full object-cover" />
+                    <img src={prop.cover_image || prop.images?.[0]} alt={prop.title} className="w-full h-full object-cover" />
                     <div className="absolute top-2 right-2 bg-surface-container-lowest/90 px-2 py-0.5 rounded-md font-label-sm text-label-sm border border-outline-variant">
                       {prop.type}
                     </div>
@@ -223,17 +229,19 @@ export const TenantDashboard = () => {
                 <p className="text-body-md text-on-surface-variant">You have no active rental applications.</p>
               ) : (
                 userApps.slice(0, 3).map((app) => {
-                  const property = properties.find(p => p.id === app.propertyId);
+                  const property = properties.find(p => p.id === (app.property_id || app.propertyId));
+                  const appStatus = app.status;
+                  const appDate   = app.applied_at || app.appliedAt;
                   return (
                     <div key={app.id} className="border-b border-outline-variant/60 pb-3 last:border-b-0 last:pb-0">
                       <div className="flex justify-between items-start gap-2">
-                        <Link to={`/user/properties/${property?.id}`} className="font-label-md text-label-md text-on-surface hover:text-primary font-bold truncate">
-                          {property?.title || "Unknown Property"}
+                        <Link to={`/user/properties/${property?.id || app.property_id || app.propertyId}`} className="font-label-md text-label-md text-on-surface hover:text-primary font-bold truncate">
+                          {property?.title || app.property_title || "Property"}
                         </Link>
-                        <StatusBadge status={app.status} />
+                        <StatusBadge status={appStatus} />
                       </div>
                       <p className="text-xs text-outline mt-1">
-                        Applied on: {new Date(app.appliedAt).toLocaleDateString()}
+                        Applied on: {new Date(appDate).toLocaleDateString()}
                       </p>
                       <Link to="/user/applications" className="text-xs text-primary hover:underline font-semibold mt-2 block">
                         View Application History &rarr;

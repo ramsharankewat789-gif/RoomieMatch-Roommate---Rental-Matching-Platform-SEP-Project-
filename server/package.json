@@ -1,13 +1,14 @@
 {
   "name": "roomiematch-server",
   "version": "1.0.0",
-  "description": "RoomieMatch backend API — Express + SQLite",
+  "description": "RoomieMatch backend API — Express + MySQL",
   "type": "commonjs",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "db:init": "node src/database/init.js"
+    "db:migrate": "node src/database/migrate.js",
+    "db:seed": "node src/database/seed.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -15,12 +16,13 @@
     "dotenv": "^16.4.5",
     "express": "^4.18.3",
     "express-rate-limit": "^7.2.0",
+    "express-validator": "^7.0.1",
     "google-auth-library": "^9.9.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.9.7",
     "nodemailer": "^6.9.13",
-    "sql.js": "^1.10.3",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

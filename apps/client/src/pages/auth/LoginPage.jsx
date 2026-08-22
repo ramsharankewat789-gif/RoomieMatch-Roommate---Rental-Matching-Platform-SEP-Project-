@@ -14,6 +14,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@shared/hooks/useAuth";
 import { apiGoogleAuth } from "@shared/services/api";
+import { apiLogin } from "@shared/services/api";
 
 export const LoginPage = () => {
   const [email, setEmail]     = useState("");
@@ -22,7 +23,7 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const { login, logout } = useAuth();
+  const { login, loginWithToken, logout } = useAuth();
   const navigate          = useNavigate();
   const [searchParams]    = useSearchParams();
 
@@ -74,21 +75,20 @@ export const LoginPage = () => {
     setError("");
     setLoading(true);
 
-    setTimeout(() => {
-      const result = login(email, password);
-      setLoading(false);
-      if (result.success) {
-        if (result.user.role === "admin") {
-          logout();
-          setError("Admin accounts sign in on the admin panel (port 5174).");
-        } else {
-          const redirect = searchParams.get("redirect");
-          navigate(redirect || "/user/dashboard");
-        }
+    const result = await login(email, password);
+    setLoading(false);
+
+    if (result.success) {
+      if (result.user.role === "admin") {
+        logout();
+        setError("Admin accounts sign in on the admin panel (port 5174).");
       } else {
-        setError(result.message);
+        const redirect = searchParams.get("redirect");
+        navigate(redirect || "/user/dashboard");
       }
-    }, 600);
+    } else {
+      setError(result.message);
+    }
   };
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;

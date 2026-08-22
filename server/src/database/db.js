@@ -1,78 +1,126 @@
 /**
- * db.js — SQLite database singleton using sql.js (pure JavaScript, no native build).
- * The database is persisted to server/roomiematch.db on every write.
+ * db.js — MySQL connection pool using mysql2/promise.
+ *
+ * Exports three helpers that match the same interface previously used by sql.js,
+ * so every controller/service only needs to change the import — not the call sites.
+ *
+ *   query(sql, params)   → SELECT  → returns array of row objects
+ *   execute(sql, params) → INSERT / UPDATE / DELETE → returns [ResultSetHeader, fields]
+ *   getConnection()      → raw PoolConnection for transactions
  */
-const path = require("path");
-const fs = require("fs");
-const initSqlJs = require("sql.js");
+const mysql = require("mysql2/promise");
 
-const DB_PATH = path.resolve(__dirname, "../../roomiematch.db");
+let _pool = null;
 
-let _db = null;
+function getPool() {
+  if (_pool) return _pool;
 
-/** Load or create the SQLite database file. */
-async function getDb() {
-  if (_db) return _db;
+  _pool = mysql.createPool({
+    host:               process.env.DB_HOST            || "localhost",
+    port:               Number(process.env.DB_PORT)    || 3306,
+    user:               process.env.DB_USER            || "root",
+    password:           process.env.DB_PASSWORD        || "",
+    database:           process.env.DB_NAME            || "roomiematch",
+    connectionLimit:    Number(process.env.DB_CONNECTION_LIMIT) || 10,
+    waitForConnections: true,
+    queueLimit:         0,
+    // Return JS Date objects for DATETIME columns
+    dateStrings:        false,
+    // Decode BIGINT as string to avoid precision loss
+    supportBigNumbers:  true,
+    bigNumberStrings:   false,
+    // Keep connections alive
+    enableKeepAlive:    true,
+    keepAliveInitialDelay: 0,
+  });
 
-  const SQL = await initSqlJs();
-
-  if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    _db = new SQL.Database(fileBuffer);
-  } else {
-    _db = new SQL.Database();
-  }
-
-  return _db;
-}
-
-/** Persist the in-memory database to disk. Call after every write operation. */
-function saveDb() {
-  if (!_db) return;
-  const data = _db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
+  return _pool;
 }
 
 /**
- * run — execute a write statement (INSERT / UPDATE / DELETE / CREATE).
+ * query — run a SELECT (or any statement that returns rows).
+ * Returns an array of plain row objects.
+ *
  * @param {string} sql
- * @param {Array|Object} params
+ * @param {Array}  params
+ * @returns {Promise<Array>}
  */
-async function run(sql, params = []) {
-  const db = await getDb();
-  db.run(sql, params);
-  saveDb();
+async function query(sql, params = []) {
+  const pool = getPool();
+  const [rows] = await pool.query(sql, params);
+  return rows;
 }
 
 /**
- * get — fetch a single row.
+ * execute — run an INSERT / UPDATE / DELETE.
+ * Returns the full mysql2 ResultSetHeader (insertId, affectedRows, etc.)
+ *
+ * @param {string} sql
+ * @param {Array}  params
+ * @returns {Promise<object>}  ResultSetHeader
+ */
+async function execute(sql, params = []) {
+  const pool = getPool();
+  const [result] = await pool.execute(sql, params);
+  return result;
+}
+
+/**
+ * get — fetch a single row (first result or null).
+ * Drop-in replacement for the old sql.js get().
+ *
+ * @param {string} sql
+ * @param {Array}  params
+ * @returns {Promise<object|null>}
  */
 async function get(sql, params = []) {
-  const db = await getDb();
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  if (stmt.step()) {
-    const row = stmt.getAsObject();
-    stmt.free();
-    return row;
-  }
-  stmt.free();
-  return null;
+  const rows = await query(sql, params);
+  return rows.length > 0 ? rows[0] : null;
 }
 
 /**
  * all — fetch all matching rows.
+ * Drop-in replacement for the old sql.js all().
+ *
+ * @param {string} sql
+ * @param {Array}  params
+ * @returns {Promise<Array>}
  */
 async function all(sql, params = []) {
-  const db = await getDb();
-  const results = [];
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  while (stmt.step()) {
-    results.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return results;
+  return query(sql, params);
 }
 
-module.exports = { getDb, saveDb, run, get, all };
+/**
+ * run — execute a write statement (INSERT / UPDATE / DELETE / CREATE).
+ * Drop-in replacement for the old sql.js run().
+ *
+ * @param {string} sql
+ * @param {Array}  params
+ * @returns {Promise<object>}  ResultSetHeader
+ */
+async function run(sql, params = []) {
+  return execute(sql, params);
+}
+
+/**
+ * getConnection — retrieve a raw PoolConnection for manual transactions.
+ * Remember to call connection.release() when done.
+ *
+ * @returns {Promise<PoolConnection>}
+ */
+async function getConnection() {
+  return getPool().getConnection();
+}
+
+/**
+ * testConnection — ping MySQL to confirm connectivity.
+ * Called during server startup.
+ */
+async function testConnection() {
+  const conn = await getConnection();
+  await conn.ping();
+  conn.release();
+  console.log("[DB] MySQL connection pool ready.");
+}
+
+module.exports = { query, execute, get, all, run, getConnection, testConnection };

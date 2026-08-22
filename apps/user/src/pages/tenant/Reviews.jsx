@@ -63,7 +63,7 @@ export const Reviews = () => {
   // Targets options
   const propertiesOptions = properties.map((p) => ({ value: p.id, label: p.title }));
   const roommateOptions = users
-    .filter((u) => u.role === "tenant" && u.id !== currentUser?.id)
+    .filter((u) => u.role === "user" && u.id !== currentUser?.id)
     .map((u) => ({ value: u.id, label: u.name }));
 
   const targetOptions = [
