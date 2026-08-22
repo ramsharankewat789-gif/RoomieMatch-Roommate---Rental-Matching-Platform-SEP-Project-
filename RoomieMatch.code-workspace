@@ -1,0 +1,54 @@
+{
+  "folders": [
+    {
+      "name": "RoomieMatch (Root)",
+      "path": "."
+    },
+    {
+      "name": "Client App",
+      "path": "apps/client"
+    },
+    {
+      "name": "Admin App",
+      "path": "apps/admin"
+    },
+    {
+      "name": "Shared",
+      "path": "shared"
+    },
+    {
+      "name": "Server",
+      "path": "server"
+    },
+    {
+      "name": "Database",
+      "path": "database"
+    },
+    {
+      "name": "Docs",
+      "path": "docs"
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "javascript.preferences.importModuleSpecifier": "non-relative",
+    "typescript.preferences.importModuleSpecifier": "non-relative",
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true
+    },
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "esbenp.prettier-vscode",
+      "bradlc.vscode-tailwindcss",
+      "dbaeumer.vscode-eslint",
+      "dsznajder.es7-react-js-snippets"
+    ]
+  }
+}
