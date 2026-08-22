@@ -14,6 +14,7 @@ import RegisterPage from "../pages/auth/RegisterPage";
 import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import EmailVerificationPage from "../pages/auth/EmailVerificationPage";
+import OtpVerificationPage from "../pages/auth/OtpVerificationPage";
 
 // ── Tenant pages ───────────────────────────────────────────────────────────────
 import TenantDashboard from "../pages/tenant/TenantDashboard";
@@ -56,6 +57,7 @@ export const UserRoutes = () => {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<EmailVerificationPage />} />
+          <Route path="/verify-otp"   element={<OtpVerificationPage />} />
         </Route>
 
         {/* ── User (Client) Mode ───────────────────────────────────── */}

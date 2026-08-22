@@ -6,6 +6,7 @@ import AdminLayout from "../layouts/AdminLayout";
 
 // Auth pages (admin needs to log in too)
 import LoginPage from "../pages/auth/LoginPage";
+import OtpVerificationPage from "../pages/auth/OtpVerificationPage";
 
 // ── Admin pages ────────────────────────────────────────────────────────────────
 import AdminDashboard from "../pages/admin/AdminDashboard";
@@ -25,7 +26,8 @@ export const AdminRoutes = () => {
       <Routes>
 
         {/* Login — admins must authenticate before accessing the panel */}
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login"      element={<LoginPage />} />
+        <Route path="/verify-otp" element={<OtpVerificationPage />} />
 
         {/* ── Admin Panel ──────────────────────────────────────────── */}
         <Route element={<AdminLayout />}>

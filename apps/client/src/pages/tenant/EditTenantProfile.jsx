@@ -5,20 +5,49 @@ import Button from "@shared/components/common/Button";
 import Input from "@shared/components/common/Input";
 import Select from "@shared/components/common/Select";
 import Textarea from "@shared/components/common/Textarea";
+import { SingleImageUpload } from "@shared/components/common/ImageUpload";
+import { apiUploadProfileImage, apiDeleteProfileImage } from "@shared/services/api";
 
 export const EditTenantProfile = () => {
   const { currentUser, updateProfile } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const [name, setName] = useState(currentUser?.name || "");
-  const [phone, setPhone] = useState(currentUser?.phone || "");
+  const [name, setName]           = useState(currentUser?.name || "");
+  const [phone, setPhone]         = useState(currentUser?.phone || "");
   const [university, setUniversity] = useState(currentUser?.university || "");
-  const [major, setMajor] = useState(currentUser?.major || "");
-  const [age, setAge] = useState(currentUser?.age || 20);
-  const [gender, setGender] = useState(currentUser?.gender || "Male");
-  const [budget, setBudget] = useState(currentUser?.budget || "$800 - $1,200");
-  const [bio, setBio] = useState(currentUser?.bio || "");
+  const [major, setMajor]         = useState(currentUser?.major || "");
+  const [age, setAge]             = useState(currentUser?.age || 20);
+  const [gender, setGender]       = useState(currentUser?.gender || "Male");
+  const [budget, setBudget]       = useState(currentUser?.budget || "$800 - $1,200");
+  const [bio, setBio]             = useState(currentUser?.bio || "");
   const [hobbiesStr, setHobbiesStr] = useState(currentUser?.hobbies?.join(", ") || "");
+  const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatar || null);
+  const [imageError, setImageError] = useState("");
+
+  const handleProfileImageUpload = async (file) => {
+    setImageError("");
+    try {
+      const data = await apiUploadProfileImage(file);
+      const fullUrl = `http://localhost:4000${data.imageUrl}`;
+      setAvatarUrl(fullUrl);
+      updateProfile({ avatar: fullUrl });
+    } catch (err) {
+      setImageError(err.message || "Failed to upload profile image.");
+      throw err;
+    }
+  };
+
+  const handleProfileImageRemove = async () => {
+    setImageError("");
+    try {
+      await apiDeleteProfileImage();
+      setAvatarUrl(null);
+      updateProfile({ avatar: null });
+    } catch (err) {
+      setImageError(err.message || "Failed to remove profile image.");
+      throw err;
+    }
+  };
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -67,6 +96,26 @@ export const EditTenantProfile = () => {
           <p className="font-body-md text-body-md text-on-surface-variant mt-0.5">
             Update your academic information and search parameters
           </p>
+        </div>
+      </div>
+
+      {/* Profile image — separate from identity verification */}
+      <div className="flex items-center gap-5 p-4 bg-surface-container-low rounded-xl border border-outline-variant mb-6">
+        <SingleImageUpload
+          mode="single"
+          label=""
+          currentImageUrl={avatarUrl}
+          onUpload={handleProfileImageUpload}
+          onRemove={avatarUrl ? handleProfileImageRemove : undefined}
+          maxSizeMB={5}
+        />
+        <div>
+          <p className="font-label-md text-label-md text-on-surface font-bold">Profile Photo</p>
+          <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+            Represents your RoomieMatch profile.<br />
+            <span className="text-outline">Not an identity verification document.</span>
+          </p>
+          {imageError && <p className="text-xs text-error mt-1">{imageError}</p>}
         </div>
       </div>
 

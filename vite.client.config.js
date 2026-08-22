@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react()],
   root: path.resolve(rootDir, "apps/client"),
   publicDir: path.resolve(rootDir, "public"),
+  envDir: rootDir,
   resolve: {
     alias: {
       "@shared": path.resolve(rootDir, "shared"),
