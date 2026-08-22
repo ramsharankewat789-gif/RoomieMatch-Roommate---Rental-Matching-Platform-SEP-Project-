@@ -20,7 +20,8 @@ export const Avatar = ({ src, name = "", size = "md", className = "", ...props }
     xxl: "w-24 h-24 text-[28px]"
   };
 
-  const isImage = !!src && src.startsWith("http");
+  // Show image if src is any non-empty string (http URLs, /api/uploads/... paths, or data URIs)
+  const isImage = !!src && src.trim().length > 0;
 
   return (
     <div

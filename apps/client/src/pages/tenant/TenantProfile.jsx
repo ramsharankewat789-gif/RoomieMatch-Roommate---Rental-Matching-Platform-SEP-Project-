@@ -1,25 +1,88 @@
-import React, { useContext } from "react";
+import React, { useContext, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
 import { mockReviews } from "@shared/data/mockReviews";
 import Avatar from "@shared/components/common/Avatar";
 import Rating from "@shared/components/common/Rating";
+import { apiUploadProfileImage, apiDeleteProfileImage } from "@shared/services/api";
 
 export const TenantProfile = () => {
-  const { currentUser } = useContext(AuthContext);
+  const { currentUser, updateProfile } = useContext(AuthContext);
+  const fileInputRef = useRef(null);
+  const [imgLoading, setImgLoading] = useState(false);
+  const [imgError, setImgError]     = useState("");
 
-  // Get reviews written about this tenant
   const userReviews = mockReviews.filter((r) => r.targetUserId === currentUser?.id);
-  const avgRating =
-    userReviews.reduce((acc, r) => acc + r.rating, 0) / (userReviews.length || 1);
+  const avgRating   = userReviews.reduce((acc, r) => acc + r.rating, 0) / (userReviews.length || 1);
 
   if (!currentUser) return null;
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = "." + file.name.split(".").pop().toLowerCase();
+    const allowed = [".jpg",".jpeg",".png",".webp"];
+    if (!allowed.includes(ext)) { setImgError("Please upload a JPG, PNG, or WEBP image."); return; }
+    if (file.size > 5 * 1024 * 1024) { setImgError("Image must be under 5 MB."); return; }
+    setImgLoading(true);
+    setImgError("");
+    try {
+      const data = await apiUploadProfileImage(file);
+      updateProfile({ avatar: `http://localhost:4000${data.imageUrl}` });
+    } catch (err) {
+      // Fallback: show local preview even if backend is offline
+      const reader = new FileReader();
+      reader.onload = (ev) => updateProfile({ avatar: ev.target.result });
+      reader.readAsDataURL(file);
+    } finally {
+      setImgLoading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    setImgLoading(true);
+    try {
+      await apiDeleteProfileImage();
+    } catch { /* non-fatal */ }
+    updateProfile({ avatar: null });
+    setImgLoading(false);
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Profile Header */}
       <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row items-center md:items-start gap-6">
-        <Avatar src={currentUser.avatar} name={currentUser.name} size="xxl" />
+        {/* Clickable avatar with change/remove controls */}
+        <div className="flex flex-col items-center gap-2 shrink-0">
+          <div className="relative group cursor-pointer" onClick={() => !imgLoading && fileInputRef.current?.click()}>
+            <Avatar src={currentUser.avatar} name={currentUser.name} size="xxl" />
+            <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              {imgLoading
+                ? <span className="material-symbols-outlined text-white text-[24px] animate-spin">progress_activity</span>
+                : <span className="material-symbols-outlined text-white text-[24px]">add_a_photo</span>
+              }
+            </div>
+          </div>
+          <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={handleAvatarChange} />
+          <div className="flex gap-2">
+            <button onClick={() => fileInputRef.current?.click()} disabled={imgLoading}
+              className="text-[10px] font-bold text-primary hover:text-surface-tint transition-colors disabled:opacity-50">
+              {currentUser.avatar ? "Change" : "Add photo"}
+            </button>
+            {currentUser.avatar && (
+              <>
+                <span className="text-[10px] text-outline">·</span>
+                <button onClick={handleAvatarRemove} disabled={imgLoading}
+                  className="text-[10px] font-bold text-error hover:text-error/70 transition-colors disabled:opacity-50">
+                  Remove
+                </button>
+              </>
+            )}
+          </div>
+          {imgError && <p className="text-[10px] text-error font-semibold text-center max-w-[96px]">{imgError}</p>}
+          <p className="text-[9px] text-outline text-center leading-tight max-w-[96px]">Profile photo only — not ID verification</p>
+        </div>
         <div className="flex-1 text-center md:text-left">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
