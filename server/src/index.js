@@ -21,6 +21,7 @@ const favouriteRoutes    = require("./routes/favouriteRoutes");
 const reportRoutes       = require("./routes/reportRoutes");
 const adminRoutes        = require("./routes/adminRoutes");
 const messageRoutes      = require("./routes/messageRoutes");
+const reviewRoutes       = require("./routes/reviewRoutes");
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -64,6 +65,7 @@ app.use("/api/favourites",    favouriteRoutes);
 app.use("/api/reports",       reportRoutes);
 app.use("/api/admin",         adminRoutes);
 app.use("/api/messages",      messageRoutes);
+app.use("/api/reviews",       reviewRoutes);
 
 // ── Health check ───────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {

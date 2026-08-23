@@ -2,7 +2,7 @@
  * api.js — Thin fetch wrapper for all RoomieMatch API calls.
  *
  * - Reads the JWT from localStorage (set by AuthContext on login).
- * - All requests go to the Express server at http://localhost:4000.
+ * - All requests go to the Express server at http://localhnpmost:4000.
  * - Never exposes secrets or tokens in URLs.
  */
 
@@ -574,6 +574,29 @@ export async function apiMarkConversationRead(conversationId) {
 export async function apiGetUnreadMessageCount() {
   const res = await fetch(`${BASE_URL}/messages/unread-count`, {
     headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** params: { targetProperty, targetUser, reviewerId } */
+export async function apiListReviews(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${BASE_URL}/reviews${qs ? "?" + qs : ""}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+/** Submit a review. data: { rating, comment, target_property?, target_user? } */
+export async function apiSubmitReview(data) {
+  const res = await fetch(`${BASE_URL}/reviews`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(data)
   });
   return handleResponse(res);
 }
