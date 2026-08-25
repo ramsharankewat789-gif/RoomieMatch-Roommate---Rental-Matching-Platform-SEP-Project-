@@ -58,39 +58,39 @@ async function seed() {
   const pw = await hash("password123");
 
   const users = [
-    // id, name, email, password_hash, role, phone, university, major, age, gender, budget_min, budget_max, bio, is_verified, email_verified
+    // id, name, email, password_hash, role, phone, university, major, age, gender, city, budget_min, budget_max, bio, is_verified, email_verified
     [
       ID.admin, "Alex Admin", "admin@roomiematch.com", pw,
       "admin", "+1 (555) 015-8899",
-      null, null, null, null, null, null,
+      null, null, null, null, "Metro City", null, null,
       "Platform administrator.",
       1, 1
     ],
     [
       ID.alex, "Alex Mercer", "alex@user.com", pw,
       "user", "+1 (555) 019-9234",
-      "State University", "Computer Science", 21, "Male", 800, 1200,
+      "State University", "Computer Science", 21, "Male", "Metro City", 800, 1200,
       "CS junior looking for a quiet study space and a friendly roommate. I enjoy hiking, coding side projects, and cooking.",
       1, 1
     ],
     [
       ID.sarah, "Sarah Jenkins", "sarah@user.com", pw,
       "user", "+1 (555) 012-3456",
-      "City College", "Business Management", 28, "Female", 1000, 1500,
+      "City College", "Business Management", 28, "Female", "Metro City", 1000, 1500,
       "Experienced with property management and happy to help students find great housing near campus.",
       1, 1
     ],
     [
       ID.marcus, "Marcus Brody", "marcus@user.com", pw,
       "user", "+1 (555) 014-4589",
-      "State University", "Business Administration", 22, "Male", 900, 1300,
+      "State University", "Business Administration", 22, "Male", "Metro City", 900, 1300,
       "Outgoing senior in business. Very active, loves soccer, and is looking for a roommate who doesn't mind occasional study groups.",
       1, 1
     ],
     [
       ID.chloe, "Chloe Henderson", "chloe@user.com", pw,
       "user", "+1 (555) 017-7722",
-      "State University", "Graphic Design", 20, "Female", 700, 1050,
+      "State University", "Graphic Design", 20, "Female", "Metro City", 700, 1050,
       "Sophomore doing graphic design. I keep my space very clean and decorated. Love indoor plants, cafe hopping, and indie music.",
       0, 1
     ],
@@ -100,11 +100,11 @@ async function seed() {
     await conn.execute(
       `INSERT INTO users
          (id, name, email, password_hash, role, phone,
-          university, major, age, gender, budget_min, budget_max, bio,
+          university, major, age, gender, city, budget_min, budget_max, bio,
           is_verified, email_verified)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE
-         name=VALUES(name), email=VALUES(email)`,
+         name=VALUES(name), email=VALUES(email), city=VALUES(city)`,
       u
     );
   }

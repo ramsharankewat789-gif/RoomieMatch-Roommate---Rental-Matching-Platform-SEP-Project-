@@ -11,7 +11,9 @@ const {
   googleAuthCallback,
   verifyGoogleOtp,
   resendOtp,
-  getMe
+  getMe,
+  sendEmailVerification,
+  confirmEmailVerification,
 } = require("../controllers/authController");
 
 const {
@@ -56,6 +58,10 @@ router.post("/reset-password",    passwordLimiter, resetPassword);
 router.patch("/change-password",  requireAuth,     changePassword);
 
 // ── Current user ───────────────────────────────────────────────────────────
-router.get("/me",                 requireAuth,     getMe);
+router.get("/me",                       requireAuth,     getMe);
+
+// ── Email verification ─────────────────────────────────────────────────────
+router.post("/send-verification",       requireAuth,     sendEmailVerification);
+router.get("/verify-email",                              confirmEmailVerification);
 
 module.exports = router;

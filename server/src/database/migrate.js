@@ -41,6 +41,7 @@ async function migrate() {
       major          VARCHAR(255)  NULL,
       age            TINYINT UNSIGNED NULL,
       gender         VARCHAR(50)   NULL,
+      city           VARCHAR(100)  NULL,
       budget_min     INT UNSIGNED  NULL,
       budget_max     INT UNSIGNED  NULL,
       bio            TEXT          NULL,
@@ -64,6 +65,10 @@ async function migrate() {
       sleep_schedule VARCHAR(50)   NOT NULL DEFAULT 'Early Bird',
       social_life    VARCHAR(50)   NOT NULL DEFAULT 'Medium',
       cooking        VARCHAR(50)   NOT NULL DEFAULT 'Sometimes',
+      drinking       VARCHAR(50)   NOT NULL DEFAULT 'No',
+      guests         VARCHAR(50)   NOT NULL DEFAULT 'Occasionally',
+      food           VARCHAR(50)   NOT NULL DEFAULT 'No Preference',
+      working_hours  VARCHAR(50)   NOT NULL DEFAULT 'Regular Hours',
       updated_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       PRIMARY KEY (id),
       UNIQUE KEY uq_user (user_id),
@@ -152,6 +157,8 @@ async function migrate() {
       title          VARCHAR(255)  NOT NULL,
       address        VARCHAR(500)  NOT NULL,
       city           VARCHAR(100)  NOT NULL DEFAULT 'Metro City',
+      latitude       DECIMAL(10,7) NULL,
+      longitude      DECIMAL(10,7) NULL,
       type           ENUM('Apartment','Townhouse','Studio','House') NOT NULL DEFAULT 'Apartment',
       bedrooms       TINYINT UNSIGNED NOT NULL DEFAULT 1,
       bathrooms      DECIMAL(3,1)  NOT NULL DEFAULT 1.0,
@@ -347,7 +354,42 @@ async function migrate() {
       CONSTRAINT fk_fav_property FOREIGN KEY (property_id) REFERENCES properties(id)  ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+    // ── 21. email_verification_tokens ─────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS email_verification_tokens (
+      id          VARCHAR(36)   NOT NULL,
+      user_id     VARCHAR(36)   NOT NULL,
+      token_hash  VARCHAR(255)  NOT NULL,
+      expires_at  DATETIME      NOT NULL,
+      used        TINYINT(1)    NOT NULL DEFAULT 0,
+      created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      INDEX idx_token (token_hash),
+      INDEX idx_user  (user_id),
+      CONSTRAINT fk_evt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+    // ── 22. compatibility_scores ───────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS compatibility_scores (
+      id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+      user_id          VARCHAR(36)   NOT NULL,
+      candidate_id     VARCHAR(36)   NOT NULL,
+      score            TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      budget_score     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      lifestyle_score  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      interests_score  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      calculated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_pair (user_id, candidate_id),
+      INDEX idx_user  (user_id),
+      INDEX idx_score (user_id, score DESC),
+      CONSTRAINT fk_cs_user      FOREIGN KEY (user_id)      REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_cs_candidate FOREIGN KEY (candidate_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   ];
+
+    // ── 21. email_verification_tokens ──────────────────────────────────
+    // (This block was erroneously placed — moved to proper array entry above)
 
   let created = 0;
   for (const ddl of tables) {

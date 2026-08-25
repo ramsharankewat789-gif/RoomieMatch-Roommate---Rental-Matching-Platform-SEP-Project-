@@ -2,9 +2,11 @@ import React, { useState, useContext, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useProperties } from "@shared/hooks/useProperties";
 import { AuthContext } from "@shared/context/AuthContext";
+import { apiAddFavourite, apiRemoveFavourite, apiGetFavouriteStatus } from "@shared/services/api";
 import Input from "@shared/components/common/Input";
 import Select from "@shared/components/common/Select";
 import EmptyState from "@shared/components/common/EmptyState";
+import PropertyMap from "@shared/components/common/PropertyMap";
 
 export const PropertySearch = () => {
   const { properties } = useProperties();
@@ -34,10 +36,25 @@ export const PropertySearch = () => {
     }
   };
 
-  const handleFavoriteToggle = (propId, e) => {
+  // Favourites state — loaded from real API
+  const [favouriteIds, setFavouriteIds] = useState(new Set());
+
+  const handleFavoriteToggle = async (propId, e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+    if (!currentUser) return;
+    try {
+      if (favouriteIds.has(propId)) {
+        await apiRemoveFavourite(propId);
+        setFavouriteIds(prev => { const s = new Set(prev); s.delete(propId); return s; });
+      } else {
+        await apiAddFavourite(propId);
+        setFavouriteIds(prev => new Set([...prev, propId]));
+      }
+    } catch (err) {
+      console.warn("Favourite toggle failed:", err.message);
+    }
+  };
     if (!currentUser) return;
     
     const favs = currentUser.favorites || [];
@@ -207,83 +224,103 @@ export const PropertySearch = () => {
           }}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {filteredProperties.map((prop) => (
-            <Link
-              key={prop.id}
-              to={`/tenant/properties/${prop.id}`}
-              className="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow relative group"
-            >
-              {/* Card Image */}
-              <div className="relative h-48 w-full bg-surface-container">
-                <img
-                  src={prop.images[0]}
-                  alt={prop.title}
-                  className="w-full h-full object-cover"
-                />
-                
-                {/* Verification Badge */}
-                {prop.isVerified && (
-                  <div className="absolute top-3 left-3 bg-secondary-container text-on-secondary-container px-2.5 py-0.5 rounded-full font-label-sm text-label-sm border border-secondary flex items-center gap-0.5 font-bold shadow-sm">
-                    <span className="material-symbols-outlined text-sm icon-fill">verified</span>
-                    VERIFIED
-                  </div>
-                )}
+        <>
+          {/* Map view of all results */}
+          {filteredProperties.some(p => p.latitude && p.longitude) && (
+            <section className="rounded-xl overflow-hidden border border-outline-variant shadow-sm">
+              <PropertyMap
+                properties={filteredProperties}
+                height="320px"
+                zoom={13}
+              />
+            </section>
+          )}
 
-                {/* Favorite Toggle Button */}
-                <button
-                  onClick={(e) => handleFavoriteToggle(prop.id, e)}
-                  className="absolute top-3 right-3 p-2 bg-surface-container-lowest/90 hover:bg-surface-container-lowest border border-outline-variant rounded-full text-error hover:scale-115 transition-transform flex items-center justify-center shadow-sm select-none"
-                  title={isFavorite(prop.id) ? "Remove Favorite" : "Add Favorite"}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {filteredProperties.map((prop) => {
+              const imgSrc  = prop.cover_image || prop.images?.[0] || null;
+              const isFaved = favouriteIds.has(prop.id);
+              const verified = prop.is_verified === 1 || prop.is_verified === true;
+              const availFrom = prop.available_from
+                ? new Date(prop.available_from).toLocaleDateString()
+                : "Now";
+              return (
+                <Link
+                  key={prop.id}
+                  to={`/user/properties/${prop.id}`}
+                  className="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow relative group"
                 >
-                  <span className={`material-symbols-outlined text-[20px] ${isFavorite(prop.id) ? "icon-fill" : ""}`}>
-                    favorite
-                  </span>
-                </button>
-              </div>
+                  {/* Card Image */}
+                  <div className="relative h-48 w-full bg-surface-container">
+                    {imgSrc ? (
+                      <img src={imgSrc} alt={prop.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-outline">
+                        <span className="material-symbols-outlined text-[48px]">home_work</span>
+                      </div>
+                    )}
 
-              {/* Card Body */}
-              <div className="p-5 flex-grow flex flex-col justify-between gap-4">
-                <div>
-                  <div className="flex justify-between items-center text-xs text-outline font-semibold mb-1">
-                    <span>{prop.type.toUpperCase()}</span>
-                    <span>AVAILABLE {prop.availableFrom}</span>
-                  </div>
-                  <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold group-hover:text-primary transition-colors truncate">
-                    {prop.title}
-                  </h3>
-                  <p className="text-body-md text-on-surface-variant font-medium mt-1 truncate">
-                    {prop.address}, {prop.city}
-                  </p>
+                    {/* Verification Badge */}
+                    {verified && (
+                      <div className="absolute top-3 left-3 bg-secondary-container text-on-secondary-container px-2.5 py-0.5 rounded-full font-label-sm text-label-sm border border-secondary flex items-center gap-0.5 font-bold shadow-sm">
+                        <span className="material-symbols-outlined text-sm icon-fill">verified</span>
+                        VERIFIED
+                      </div>
+                    )}
 
-                  <div className="flex items-center gap-4 text-xs text-on-surface-variant font-medium mt-3">
-                    <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">bed</span>
-                      {prop.bedrooms} Bed
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">bathtub</span>
-                      {prop.bathrooms} Bath
-                    </span>
+                    {/* Favourite Toggle */}
+                    {currentUser && (
+                      <button
+                        onClick={(e) => handleFavoriteToggle(prop.id, e)}
+                        className="absolute top-3 right-3 p-2 bg-surface-container-lowest/90 hover:bg-surface-container-lowest border border-outline-variant rounded-full transition-transform flex items-center justify-center shadow-sm select-none"
+                        title={isFaved ? "Remove from Favourites" : "Save Property"}
+                      >
+                        <span className={`material-symbols-outlined text-[20px] ${isFaved ? "text-error icon-fill" : "text-outline"}`}>
+                          favorite
+                        </span>
+                      </button>
+                    )}
                   </div>
-                </div>
 
-                <div className="pt-4 border-t border-outline-variant/60 flex justify-between items-center">
-                  <div>
-                    <span className="font-headline-md text-headline-md text-primary font-bold">
-                      ${prop.price}
-                    </span>
-                    <span className="text-xs text-outline font-medium">/month</span>
+                  {/* Card Body */}
+                  <div className="p-5 flex-grow flex flex-col justify-between gap-4">
+                    <div>
+                      <div className="flex justify-between items-center text-xs text-outline font-semibold mb-1">
+                        <span>{prop.type?.toUpperCase()}</span>
+                        <span>AVAILABLE {availFrom}</span>
+                      </div>
+                      <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold group-hover:text-primary transition-colors truncate">
+                        {prop.title}
+                      </h3>
+                      <p className="text-body-md text-on-surface-variant font-medium mt-1 truncate">
+                        {prop.address}, {prop.city}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-on-surface-variant font-medium mt-3">
+                        <span className="flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm">bed</span>
+                          {prop.bedrooms} Bed
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm">bathtub</span>
+                          {prop.bathrooms} Bath
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-outline-variant/60 pt-3">
+                      <span className="font-headline-sm text-headline-sm text-primary font-bold">
+                        ${prop.price}<span className="text-xs text-outline font-normal">/mo</span>
+                      </span>
+                      <span className="text-xs text-primary font-bold flex items-center gap-0.5">
+                        View Details
+                        <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-xs text-primary font-bold group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
-                    View Details
-                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+                </Link>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

@@ -1,116 +1,191 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+/**
+ * EmailVerificationPage.jsx
+ *
+ * Two modes:
+ *
+ * 1. Landing from email link (?token=...&email=...)
+ *    → calls GET /api/auth/verify-email to confirm the token
+ *    → shows success/failure and redirects to /login
+ *
+ * 2. No URL params (user navigated here manually / after registration)
+ *    → shows "Send verification email" button
+ *    → calls POST /api/auth/send-verification
+ *    → user then checks their inbox and clicks the link
+ */
+import React, { useState, useEffect, useContext } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { AuthContext } from "@shared/context/AuthContext";
+import { apiSendVerificationEmail, apiVerifyEmail } from "@shared/services/api";
 
 export const EmailVerificationPage = () => {
-  const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const navigate = useNavigate();
+  const [searchParams]    = useSearchParams();
+  const navigate          = useNavigate();
+  const { currentUser, updateProfile } = useContext(AuthContext);
 
-  const handleChange = (idx, val) => {
-    if (isNaN(Number(val))) return;
-    const newCode = [...code];
-    newCode[idx] = val.substring(val.length - 1);
-    setCode(newCode);
+  const token = searchParams.get("token") || "";
+  const email = searchParams.get("email") || "";
 
-    // Auto-focus next field
-    if (val && idx < 5) {
-      document.getElementById(`digit_${idx + 1}`).focus();
+  const [status,   setStatus]   = useState("idle"); // idle | verifying | verified | error | sent
+  const [message,  setMessage]  = useState("");
+  const [loading,  setLoading]  = useState(false);
+
+  // ── Auto-verify when token+email in URL ──────────────────────────────────
+  useEffect(() => {
+    if (!token || !email) return;
+    setStatus("verifying");
+    apiVerifyEmail(token, email)
+      .then(data => {
+        setStatus("verified");
+        setMessage(data.message || "Email verified successfully!");
+        // Update context so the verified badge shows immediately
+        updateProfile?.({ email_verified: true });
+        setTimeout(() => navigate("/login"), 2500);
+      })
+      .catch(err => {
+        setStatus("error");
+        setMessage(err.message || "Verification failed. The link may have expired.");
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, email]);
+
+  // ── Send verification email ───────────────────────────────────────────────
+  const handleSend = async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const data = await apiSendVerificationEmail();
+      setStatus("sent");
+      setMessage(data.message || "Verification email sent. Check your inbox.");
+    } catch (err) {
+      setStatus("error");
+      setMessage(err.message || "Failed to send verification email.");
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleKeyDown = (idx, e) => {
-    if (e.key === "Backspace" && !code[idx] && idx > 0) {
-      document.getElementById(`digit_${idx - 1}`).focus();
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError("");
-
-    const fullCode = code.join("");
-    if (fullCode.length < 6) {
-      setError("Please enter the full 6-digit verification code.");
-      return;
-    }
-
-    setSuccess("Email verified successfully!");
-    setTimeout(() => {
-      navigate("/login");
-    }, 1500);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-8 relative overflow-hidden font-body-md text-on-surface w-full">
       <div
         className="absolute inset-0 z-0 bg-cover bg-center opacity-25"
-        style={{
-          backgroundImage:
-            "url('https://lh3.googleusercontent.com/aida-public/AB6AXuADeMePqBZADlSaGN2DpBmW6f6YM3nnDOHtFDHFZKlrAms-eK3OyHFRQB3Lrr_ep65YRntmyqsM3r4xVckoQy4oZtc5VtzZoVO-es-eNgvH8lcmr7SyMB0-Cvar29j5V3lun5cqvYKRqUdXlU-5ApoAggTU4j0W1aACxk7Jr-hUJEa1eyDkDDoaOAf1k5OHjnosDkhqDhnmVRcCzDEoUNYb4I_rbOELXypDYiSeZw6J6S7pDYd3weOT')",
-        }}
-      ></div>
-      <div className="absolute inset-0 z-0 bg-gradient-to-br from-surface/80 to-surface-container-low/90"></div>
+        style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuADeMePqBZADlSaGN2DpBmW6f6YM3nnDOHtFDHFZKlrAms-eK3OyHFRQB3Lrr_ep65YRntmyqsM3r4xVckoQy4oZtc5VtzZoVO-es-eNgvH8lcmr7SyMB0-Cvar29j5V3lun5cqvYKRqUdXlU-5ApoAggTU4j0W1aACxk7Jr-hUJEa1eyDkDDoaOAf1k5OHjnosDkhqDhnmVRcCzDEoUNYb4I_rbOELXypDYiSeZw6J6S7pDYd3weOT')" }}
+      />
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-surface/80 to-surface-container-low/90" />
 
       <div className="bg-surface-container-lowest w-full max-w-md rounded-xl p-8 relative z-10 border border-outline-variant/40 shadow-[0px_4px_12px_rgba(0,0,0,0.05)] backdrop-blur-sm">
+
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-container/20 text-primary mb-4">
             <span className="material-symbols-outlined text-3xl font-bold">mark_email_read</span>
           </div>
           <h1 className="font-headline-lg text-headline-lg text-primary mb-2 tracking-tight">
-            Verify Email
+            Email Verification
           </h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Enter the 6-digit code sent to your student email.
+            {token && email
+              ? "Confirming your email address..."
+              : "Verify your student email to unlock all features."}
           </p>
         </div>
 
-        {error && (
-          <div className="bg-error-container/20 border border-error/40 text-error p-3 rounded-lg text-xs font-semibold mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-sm">warning</span>
-            <span>{error}</span>
+        {/* Verifying spinner */}
+        {status === "verifying" && (
+          <div className="flex items-center justify-center gap-3 py-8 text-on-surface-variant">
+            <span className="material-symbols-outlined text-[24px] animate-spin">progress_activity</span>
+            <span>Verifying your email...</span>
           </div>
         )}
 
-        {success && (
-          <div className="bg-secondary-container/20 border border-secondary/40 text-secondary p-3 rounded-lg text-xs font-semibold mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-sm">check_circle</span>
-            <span>{success}</span>
+        {/* Success */}
+        {status === "verified" && (
+          <div className="space-y-5">
+            <div className="bg-secondary-container/20 border border-secondary/40 text-secondary p-4 rounded-xl text-sm font-semibold flex items-start gap-2">
+              <span className="material-symbols-outlined text-sm icon-fill mt-0.5">check_circle</span>
+              <span>{message}</span>
+            </div>
+            <p className="text-xs text-on-surface-variant text-center">Redirecting to login...</p>
+            <Link to="/login" className="w-full bg-primary text-on-primary font-label-md text-label-md py-3 rounded-lg hover:bg-surface-tint flex items-center justify-center gap-2 transition-all">
+              <span className="material-symbols-outlined text-[20px]">login</span>
+              Sign In Now
+            </Link>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex justify-between gap-2">
-            {code.map((digit, idx) => (
-              <input
-                key={idx}
-                id={`digit_${idx}`}
-                value={digit}
-                onChange={(e) => handleChange(idx, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(idx, e)}
-                className="w-12 h-14 text-center border border-outline-variant rounded-lg bg-surface-container-lowest text-on-surface text-xl font-bold focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all duration-200"
-                type="text"
-                maxLength="1"
-                required
-              />
-            ))}
+        {/* Error */}
+        {status === "error" && (
+          <div className="space-y-5">
+            <div className="bg-error-container/20 border border-error/40 text-error p-4 rounded-xl text-sm font-semibold flex items-start gap-2">
+              <span className="material-symbols-outlined text-sm mt-0.5">error</span>
+              <span>{message}</span>
+            </div>
+            {currentUser && (
+              <button
+                onClick={handleSend}
+                disabled={loading}
+                className="w-full border border-primary text-primary font-label-md text-label-md py-3 rounded-lg hover:bg-primary-container/10 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              >
+                {loading
+                  ? <><span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span> Sending...</>
+                  : <><span className="material-symbols-outlined text-[20px]">send</span> Request New Link</>
+                }
+              </button>
+            )}
+            <Link to="/login" className="block text-center text-primary font-semibold text-sm hover:underline">
+              Back to Sign In
+            </Link>
           </div>
+        )}
 
-          <button
-            type="submit"
-            className="w-full bg-primary text-on-primary font-label-md text-label-md py-3.5 rounded-lg hover:bg-surface-tint active:scale-[0.98] transition-all duration-200 shadow-sm flex justify-center items-center gap-2"
-          >
-            <span>Verify & Continue</span>
-            <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-          </button>
-        </form>
+        {/* Sent confirmation */}
+        {status === "sent" && (
+          <div className="space-y-5">
+            <div className="bg-secondary-container/20 border border-secondary/40 text-secondary p-4 rounded-xl text-sm font-semibold flex items-start gap-2">
+              <span className="material-symbols-outlined text-sm icon-fill mt-0.5">check_circle</span>
+              <span>{message}</span>
+            </div>
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              Click the link in the email to verify your address. The link expires in 24 hours.
+            </p>
+            <Link to="/user/dashboard" className="block text-center text-primary font-semibold text-sm hover:underline">
+              Continue to Dashboard
+            </Link>
+          </div>
+        )}
 
-        <div className="text-center pt-6 text-body-md text-on-surface-variant">
-          Didn't receive the code?{" "}
-          <button className="text-primary hover:text-surface-tint font-semibold font-label-md underline">
-            Resend Email
-          </button>
-        </div>
+        {/* Idle — no token in URL */}
+        {status === "idle" && !token && (
+          <div className="space-y-5">
+            {currentUser?.email_verified ? (
+              <div className="bg-secondary-container/20 border border-secondary/40 text-secondary p-4 rounded-xl text-sm font-semibold flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm icon-fill">check_circle</span>
+                Your email is already verified.
+              </div>
+            ) : (
+              <>
+                <p className="text-body-md text-on-surface-variant text-sm leading-relaxed">
+                  We will send a verification link to{" "}
+                  <strong className="text-on-surface">{currentUser?.email || "your registered email"}</strong>.
+                  Click the link in the email to verify your account.
+                </p>
+                <button
+                  onClick={handleSend}
+                  disabled={loading}
+                  className="w-full bg-primary text-on-primary font-label-md text-label-md py-3.5 rounded-lg hover:bg-surface-tint flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  {loading
+                    ? <><span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span> Sending...</>
+                    : <><span>Send Verification Email</span><span className="material-symbols-outlined text-[20px]">send</span></>
+                  }
+                </button>
+              </>
+            )}
+            <div className="text-center pt-2">
+              <Link to="/user/profile" className="text-xs text-on-surface-variant hover:text-on-surface transition-colors">
+                ← Back to Profile
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

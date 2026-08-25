@@ -117,7 +117,7 @@ async function listProperties(req, res) {
       `SELECT p.id, p.owner_id, p.title, p.address, p.city, p.type,
               p.bedrooms, p.bathrooms, p.price, p.deposit,
               p.available_from, p.status, p.is_verified,
-              p.created_at,
+              p.latitude, p.longitude, p.created_at,
               u.name AS owner_name, u.profile_image AS owner_image,
               (SELECT image_path FROM property_images
                WHERE property_id = p.id AND is_primary = 1 LIMIT 1) AS cover_image
@@ -191,6 +191,7 @@ async function createProperty(req, res) {
     const {
       title, address, city, type, bedrooms, bathrooms,
       price, deposit, description, available_from,
+      latitude, longitude,
       amenities = [], rules = []
     } = req.body;
 
@@ -203,8 +204,8 @@ async function createProperty(req, res) {
     await run(
       `INSERT INTO properties
          (id, owner_id, title, address, city, type, bedrooms, bathrooms,
-          price, deposit, description, available_from, status, is_verified)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0)`,
+          price, deposit, description, available_from, latitude, longitude, status, is_verified)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0)`,
       [
         propId,
         req.user.id,
@@ -217,7 +218,9 @@ async function createProperty(req, res) {
         Number(price),
         Number(deposit) || Number(price) || 0,
         (description || "").trim(),
-        available_from || null
+        available_from || null,
+        latitude ? parseFloat(latitude) : null,
+        longitude ? parseFloat(longitude) : null,
       ]
     );
 
@@ -266,6 +269,7 @@ async function updateProperty(req, res) {
     const {
       title, address, city, type, bedrooms, bathrooms,
       price, deposit, description, available_from,
+      latitude, longitude,
       amenities, rules
     } = req.body;
 
@@ -278,6 +282,8 @@ async function updateProperty(req, res) {
     if (city         !== undefined) { updates.push("city = ?");           params.push(city.trim()); }
     if (type         !== undefined) { updates.push("type = ?");           params.push(type); }
     if (bedrooms     !== undefined) { updates.push("bedrooms = ?");       params.push(Number(bedrooms)); }
+    if (latitude     !== undefined) { updates.push("latitude = ?");       params.push(latitude ? parseFloat(latitude) : null); }
+    if (longitude    !== undefined) { updates.push("longitude = ?");      params.push(longitude ? parseFloat(longitude) : null); }
     if (bathrooms    !== undefined) { updates.push("bathrooms = ?");      params.push(Number(bathrooms)); }
     if (price        !== undefined) { updates.push("price = ?");          params.push(Number(price)); }
     if (deposit      !== undefined) { updates.push("deposit = ?");        params.push(Number(deposit)); }

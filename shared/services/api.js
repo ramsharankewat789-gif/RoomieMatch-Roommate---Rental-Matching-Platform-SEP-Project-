@@ -600,3 +600,48 @@ export async function apiSubmitReview(data) {
   });
   return handleResponse(res);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL VERIFICATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Send verification email to the current user's address (requires JWT). */
+export async function apiSendVerificationEmail() {
+  const res = await fetch(`${BASE_URL}/auth/send-verification`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({})
+  });
+  return handleResponse(res);
+}
+
+/** Confirm the email verification link (token + email from URL params). */
+export async function apiVerifyEmail(token, email) {
+  const res = await fetch(
+    `${BASE_URL}/auth/verify-email?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`,
+    { headers: authHeaders() }
+  );
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPATIBILITY SCORES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Save computed compatibility scores for the current user. */
+export async function apiSaveCompatibilityScores(scores) {
+  const res = await fetch(`${BASE_URL}/compatibility/save`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ scores })
+  });
+  return handleResponse(res);
+}
+
+/** Retrieve stored compatibility scores for the current user. */
+export async function apiGetCompatibilityScores() {
+  const res = await fetch(`${BASE_URL}/compatibility`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}

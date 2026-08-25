@@ -31,12 +31,14 @@ async function buildUserResponse(userId) {
   safe.updated_at = isoDate(safe.updated_at);
 
   const prefs = await get(
-    "SELECT smoke, pet, cleanliness, sleep_schedule, social_life, cooking FROM user_preferences WHERE user_id = ?",
+    "SELECT smoke, pet, cleanliness, sleep_schedule, social_life, cooking, drinking, guests, food, working_hours FROM user_preferences WHERE user_id = ?",
     [userId]
   );
   safe.preferences = prefs
     ? { smoke: prefs.smoke, pet: prefs.pet, clean: prefs.cleanliness,
-        sleep: prefs.sleep_schedule, social: prefs.social_life, cooking: prefs.cooking }
+        sleep: prefs.sleep_schedule, social: prefs.social_life, cooking: prefs.cooking,
+        drinking: prefs.drinking, guests: prefs.guests, food: prefs.food,
+        working_hours: prefs.working_hours }
     : {};
 
   const hobbyRows = await all("SELECT hobby FROM user_hobbies WHERE user_id = ? ORDER BY id", [userId]);
@@ -53,18 +55,21 @@ async function buildUserResponse(userId) {
   return safe;
 }
 
-// ── GET /api/users  (admin only) ───────────────────────────────────────────
+// ── GET /api/users ────────────────────────────────────────────────────────
+// Admin: full list with all fields, all users
+// Authenticated non-admin: public-safe subset for roommate matching
 async function listUsers(req, res) {
   try {
-    const page  = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit = Math.min(100, parseInt(req.query.limit) || 20);
-    const offset = (page - 1) * limit;
+    const isAdmin = req.user?.role === "admin";
+    const page    = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit   = Math.min(100, parseInt(req.query.limit) || 20);
+    const offset  = (page - 1) * limit;
 
-    const search   = req.query.search ? `%${req.query.search}%` : null;
-    const roleFilter = req.query.role || null;
+    const search     = req.query.search ? `%${req.query.search}%` : null;
+    const roleFilter = req.query.role   || null;
 
     let whereClauses = [];
-    let params = [];
+    let params       = [];
 
     if (search) {
       whereClauses.push("(u.name LIKE ? OR u.email LIKE ?)");
@@ -75,6 +80,13 @@ async function listUsers(req, res) {
       params.push(roleFilter);
     }
 
+    // Non-admin callers only see other normal users (not admins, not themselves)
+    if (!isAdmin) {
+      whereClauses.push("u.role = 'user'");
+      whereClauses.push("u.id != ?");
+      params.push(req.user.id);
+    }
+
     const where = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
 
     const [countRow] = await all(
@@ -82,24 +94,70 @@ async function listUsers(req, res) {
       params
     );
 
+    // Admin gets email + verification status; non-admin gets public-safe fields only
+    const selectCols = isAdmin
+      ? `u.id, u.name, u.email, u.role, u.profile_image,
+         u.phone, u.is_verified, u.email_verified, u.created_at,
+         vd.status AS verification_status`
+      : `u.id, u.name, u.role, u.profile_image,
+         u.university, u.major, u.age, u.gender,
+         u.budget_min, u.budget_max, u.bio, u.is_verified,
+         p.smoke, p.pet, p.cleanliness, p.sleep_schedule, p.social_life, p.cooking`;
+
+    const joinCols = isAdmin
+      ? `LEFT JOIN verification_docs vd ON vd.user_id = u.id`
+      : `LEFT JOIN user_preferences p ON p.user_id = u.id`;
+
     const users = await all(
-      `SELECT u.id, u.name, u.email, u.role, u.profile_image,
-              u.phone, u.is_verified, u.email_verified, u.created_at,
-              vd.status AS verification_status
+      `SELECT ${selectCols}
        FROM users u
-       LEFT JOIN verification_docs vd ON vd.user_id = u.id
+       ${joinCols}
        ${where}
        ORDER BY u.created_at DESC
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
 
+    // For non-admin, reshape preferences into nested object and fetch hobbies
+    let shaped = users;
+    if (!isAdmin) {
+      shaped = await Promise.all(users.map(async u => {
+        const hobbyRows = await all(
+          "SELECT hobby FROM user_hobbies WHERE user_id = ? ORDER BY id", [u.id]
+        );
+        return {
+          id:           u.id,
+          name:         u.name,
+          role:         u.role,
+          profile_image: u.profile_image,
+          university:   u.university,
+          major:        u.major,
+          age:          u.age,
+          gender:       u.gender,
+          budget_min:   u.budget_min,
+          budget_max:   u.budget_max,
+          bio:          u.bio,
+          is_verified:  u.is_verified,
+          hobbies:      hobbyRows.map(r => r.hobby),
+          preferences: {
+            smoke:   u.smoke,
+            pet:     u.pet,
+            clean:   u.cleanliness,
+            sleep:   u.sleep_schedule,
+            social:  u.social_life,
+            cooking: u.cooking,
+          }
+        };
+      }));
+    } else {
+      shaped = users.map(u => ({ ...u, created_at: isoDate(u.created_at) }));
+    }
+
     return res.json({
-      users: users.map(u => ({ ...u, created_at: isoDate(u.created_at) })),
+      users: shaped,
       pagination: {
         total: countRow?.total || 0,
-        page,
-        limit,
+        page, limit,
         pages: Math.ceil((countRow?.total || 0) / limit)
       }
     });
@@ -144,9 +202,9 @@ async function updateUser(req, res) {
 
     const {
       name, phone, university, major,
-      age, gender, budget_min, budget_max, bio,
+      age, gender, city, budget_min, budget_max, bio,
       // preferences
-      smoke, pet, clean, sleep, social, cooking,
+      smoke, pet, clean, sleep, social, cooking, drinking, guests, food, working_hours,
       // hobbies
       hobbies
     } = req.body;
@@ -161,6 +219,7 @@ async function updateUser(req, res) {
     if (major      !== undefined) { userUpdates.push("major = ?");      userParams.push(major || null); }
     if (age        !== undefined) { userUpdates.push("age = ?");        userParams.push(Number(age) || null); }
     if (gender     !== undefined) { userUpdates.push("gender = ?");     userParams.push(gender || null); }
+    if (city       !== undefined) { userUpdates.push("city = ?");       userParams.push(city || null); }
     if (budget_min !== undefined) { userUpdates.push("budget_min = ?"); userParams.push(Number(budget_min) || null); }
     if (budget_max !== undefined) { userUpdates.push("budget_max = ?"); userParams.push(Number(budget_max) || null); }
     if (bio        !== undefined) { userUpdates.push("bio = ?");        userParams.push(bio || null); }
@@ -174,13 +233,15 @@ async function updateUser(req, res) {
     }
 
     // Update preferences if any preference fields supplied
-    const prefFields = { smoke, pet, clean, sleep, social, cooking };
+    const prefFields = { smoke, pet, clean, sleep, social, cooking, drinking, guests, food, working_hours };
     const prefUpdates = [];
     const prefParams  = [];
 
     const prefColumnMap = {
       smoke: "smoke", pet: "pet", clean: "cleanliness",
-      sleep: "sleep_schedule", social: "social_life", cooking: "cooking"
+      sleep: "sleep_schedule", social: "social_life", cooking: "cooking",
+      drinking: "drinking", guests: "guests", food: "food",
+      working_hours: "working_hours"
     };
 
     for (const [key, col] of Object.entries(prefColumnMap)) {

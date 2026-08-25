@@ -33,6 +33,7 @@ function normaliseUser(user) {
     major:       user.major        || "",
     age:         user.age          || null,
     gender:      user.gender       || "",
+    city:        user.city         || "",
     budget_min:  user.budget_min   || null,
     budget_max:  user.budget_max   || null,
     bio:         user.bio          || "",

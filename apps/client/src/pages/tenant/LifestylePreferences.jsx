@@ -1,129 +1,186 @@
+/**
+ * LifestylePreferences.jsx
+ *
+ * Saves lifestyle preferences to PATCH /api/users/:id (real MySQL backend).
+ * Includes all 10 PRD-required preference fields:
+ * smoke, pet, cleanliness, sleep_schedule, social_life, cooking,
+ * drinking, guests, food, working_hours.
+ */
 import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
+import { apiUpdateUser } from "@shared/services/api";
 import Button from "@shared/components/common/Button";
-import Select from "@shared/components/common/Select";
+
+const PREFERENCES = [
+  {
+    key: "smoke",
+    label: "Smoking",
+    icon: "smoking_rooms",
+    options: ["No", "Outside Only", "Yes"],
+  },
+  {
+    key: "drinking",
+    label: "Drinking",
+    icon: "local_bar",
+    options: ["No", "Socially", "Regularly"],
+  },
+  {
+    key: "pet",
+    label: "Pets",
+    icon: "pets",
+    options: ["No Pets", "Cats Allowed", "Dogs Allowed", "Dog or Cat Allowed", "Pets Allowed"],
+  },
+  {
+    key: "clean",
+    label: "Cleanliness",
+    icon: "cleaning_services",
+    options: ["Low", "Medium", "High", "Very High"],
+  },
+  {
+    key: "sleep",
+    label: "Sleep Schedule",
+    icon: "bedtime",
+    options: ["Early Bird", "Night Owl", "Flexible"],
+  },
+  {
+    key: "social",
+    label: "Social Life",
+    icon: "group",
+    options: ["Introvert", "Medium", "High", "Very Social"],
+  },
+  {
+    key: "cooking",
+    label: "Cooking",
+    icon: "restaurant",
+    options: ["Never", "Sometimes", "Often", "Every Day"],
+  },
+  {
+    key: "guests",
+    label: "Guests / Visitors",
+    icon: "person_add",
+    options: ["No Guests", "Occasionally", "Regularly", "Frequently"],
+  },
+  {
+    key: "food",
+    label: "Food Preference",
+    icon: "lunch_dining",
+    options: ["No Preference", "Vegetarian", "Vegan", "Halal", "Kosher"],
+  },
+  {
+    key: "working_hours",
+    label: "Working / Study Hours",
+    icon: "schedule",
+    options: ["Regular Hours", "Early Shifts", "Late Night", "Remote / Flexible"],
+  },
+];
 
 export const LifestylePreferences = () => {
   const { currentUser, updateProfile } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const [smoke, setSmoke] = useState(currentUser?.preferences?.smoke || "No");
-  const [pet, setPet] = useState(currentUser?.preferences?.pet || "No Pets");
-  const [clean, setClean] = useState(currentUser?.preferences?.clean || "Medium");
-  const [sleep, setSleep] = useState(currentUser?.preferences?.sleep || "Early Bird");
-  const [social, setSocial] = useState(currentUser?.preferences?.social || "Medium");
-  const [cooking, setCooking] = useState(currentUser?.preferences?.cooking || "Sometimes");
+  const p = currentUser?.preferences || {};
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    updateProfile({
-      preferences: {
-        smoke,
-        pet,
-        clean,
-        sleep,
-        social,
-        cooking
-      }
-    });
-    navigate("/user/profile");
+  const [prefs, setPrefs] = useState({
+    smoke:         p.smoke         || "No",
+    drinking:      p.drinking      || "No",
+    pet:           p.pet           || "No Pets",
+    clean:         p.clean         || "Medium",
+    sleep:         p.sleep         || "Early Bird",
+    social:        p.social        || "Medium",
+    cooking:       p.cooking       || "Sometimes",
+    guests:        p.guests        || "Occasionally",
+    food:          p.food          || "No Preference",
+    working_hours: p.working_hours || "Regular Hours",
+  });
+
+  const [saving, setSaving] = useState(false);
+  const [saved,  setSaved]  = useState(false);
+  const [error,  setError]  = useState("");
+
+  const setOption = (key, val) => setPrefs(prev => ({ ...prev, [key]: val }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      const data = await apiUpdateUser(currentUser.id, prefs);
+      updateProfile({ preferences: data.user.preferences });
+      setSaved(true);
+      setTimeout(() => navigate("/user/profile"), 1200);
+    } catch (err) {
+      setError(err.message || "Failed to save preferences.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const yesNoOptions = [
-    { value: "No", label: "No" },
-    { value: "Yes", label: "Yes" }
-  ];
-
-  const petOptions = [
-    { value: "No Pets", label: "No Pets" },
-    { value: "Cats Only", label: "Cats Only" },
-    { value: "Dogs Only", label: "Dogs Only" },
-    { value: "Pets Allowed", label: "Pets Allowed" }
-  ];
-
-  const levelOptions = [
-    { value: "Low", label: "Low" },
-    { value: "Medium", label: "Medium" },
-    { value: "High", label: "High" }
-  ];
-
-  const sleepOptions = [
-    { value: "Early Bird", label: "Early Bird" },
-    { value: "Night Owl", label: "Night Owl" },
-    { value: "Flexible", label: "Flexible" }
-  ];
-
-  const cookingOptions = [
-    { value: "Rarely", label: "Rarely" },
-    { value: "Sometimes", label: "Sometimes" },
-    { value: "Often", label: "Often" }
-  ];
-
   return (
-    <div className="max-w-xl mx-auto bg-surface-container-lowest p-8 rounded-xl border border-outline-variant shadow-sm">
-      <div className="text-center mb-6">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-container/20 text-primary mb-3">
-          <span className="material-symbols-outlined text-3xl font-bold">tune</span>
-        </div>
-        <h1 className="font-headline-sm text-headline-sm text-on-surface">Lifestyle Preferences Quiz</h1>
+    <div className="max-w-3xl mx-auto space-y-6 pb-12">
+      <div>
+        <h1 className="font-headline-md text-headline-md text-on-surface font-bold">Lifestyle Quiz</h1>
         <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-          Adjust your options to match with compatible roommates
+          Answer honestly — this helps us match you with compatible roommates
         </p>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-5">
-        <Select
-          label="Do you smoke?"
-          value={smoke}
-          onChange={(e) => setSmoke(e.target.value)}
-          options={yesNoOptions}
-        />
-
-        <Select
-          label="Pets preferences"
-          value={pet}
-          onChange={(e) => setPet(e.target.value)}
-          options={petOptions}
-        />
-
-        <Select
-          label="Cleanliness levels inside shared areas"
-          value={clean}
-          onChange={(e) => setClean(e.target.value)}
-          options={levelOptions}
-        />
-
-        <Select
-          label="Sleep schedule / Sleeping patterns"
-          value={sleep}
-          onChange={(e) => setSleep(e.target.value)}
-          options={sleepOptions}
-        />
-
-        <Select
-          label="Social engagement / Having friends over"
-          value={social}
-          onChange={(e) => setSocial(e.target.value)}
-          options={levelOptions}
-        />
-
-        <Select
-          label="How often do you cook at home?"
-          value={cooking}
-          onChange={(e) => setCooking(e.target.value)}
-          options={cookingOptions}
-        />
-
-        <div className="flex justify-end gap-3 pt-6 border-t border-outline-variant/60 mt-6">
-          <Button type="button" variant="outline" onClick={() => navigate("/user/profile")}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary">
-            Save Preferences
-          </Button>
+      {saved && (
+        <div className="bg-secondary-container/20 border border-secondary/40 text-secondary p-3 rounded-xl text-sm font-semibold flex items-center gap-2">
+          <span className="material-symbols-outlined text-sm">check_circle</span>
+          Preferences saved! Redirecting to profile...
         </div>
-      </form>
+      )}
+      {error && (
+        <div className="bg-error-container/20 border border-error/40 text-error p-3 rounded-xl text-sm font-semibold flex items-center gap-2">
+          <span className="material-symbols-outlined text-sm">warning</span>
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {PREFERENCES.map(({ key, label, icon, options }) => (
+          <div
+            key={key}
+            className="bg-surface-container-lowest rounded-xl border border-outline-variant p-5 shadow-sm"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined text-primary text-[22px]">{icon}</span>
+              <h3 className="font-label-md text-label-md text-on-surface font-bold">{label}</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {options.map(opt => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setOption(key, opt)}
+                  className={`px-4 py-2 rounded-xl border font-label-md text-label-md transition-all select-none ${
+                    prefs[key] === opt
+                      ? "bg-primary text-on-primary border-primary shadow-sm"
+                      : "border-outline-variant text-on-surface-variant hover:bg-surface-container-high"
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <Button variant="outline" onClick={() => navigate("/user/profile")} disabled={saving}>
+          Cancel
+        </Button>
+        <Button variant="primary" onClick={handleSave} disabled={saving} className="px-8">
+          {saving ? (
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+              Saving...
+            </span>
+          ) : "Save Preferences"}
+        </Button>
+      </div>
     </div>
   );
 };

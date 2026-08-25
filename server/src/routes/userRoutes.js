@@ -26,7 +26,9 @@ const profileUpdateLimiter = rateLimit({
   message: { error: "Too many profile updates. Please try again later." }
 });
 
-router.get("/",                   requireAuth, requireAdmin,       listUsers);
+// Admin: full list with all fields
+// Authenticated non-admin: public-safe subset (for roommate matching)
+router.get("/",                   requireAuth,                     listUsers);
 router.get("/:id",                requireAuth,                     getUser);
 router.patch("/:id",              requireAuth, profileUpdateLimiter, updateUser);
 router.delete("/:id",             requireAuth, requireAdmin,       deleteUser);

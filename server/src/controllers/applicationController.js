@@ -108,13 +108,35 @@ async function listApplications(req, res) {
       [...params, limit, offset]
     );
 
+    // Fetch history for each application
+    const appIds = rows.map(r => r.id);
+    let historyMap = {};
+    if (appIds.length > 0) {
+      const placeholders = appIds.map(() => "?").join(",");
+      const histRows = await all(
+        `SELECT application_id, status, label, changed_at
+         FROM application_history
+         WHERE application_id IN (${placeholders})
+         ORDER BY changed_at ASC`,
+        appIds
+      );
+      for (const h of histRows) {
+        if (!historyMap[h.application_id]) historyMap[h.application_id] = [];
+        historyMap[h.application_id].push({
+          status:     h.status,
+          label:      h.label,
+          changed_at: isoDate(h.changed_at)
+        });
+      }
+    }
+
     return res.json({
       applications: rows.map(r => ({
         ...r,
         applied_at: isoDate(r.applied_at),
-        updated_at: isoDate(r.updated_at)
-      })),
-      pagination: {
+        updated_at: isoDate(r.updated_at),
+        history:    historyMap[r.id] || []
+      })),      pagination: {
         total: countRow?.total || 0,
         page, limit,
         pages: Math.ceil((countRow?.total || 0) / limit)

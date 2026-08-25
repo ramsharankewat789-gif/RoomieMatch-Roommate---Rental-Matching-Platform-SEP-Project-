@@ -23,6 +23,7 @@ import Avatar from "@shared/components/common/Avatar";
 import Button from "@shared/components/common/Button";
 import Modal from "@shared/components/common/Modal";
 import Textarea from "@shared/components/common/Textarea";
+import PropertyMap from "@shared/components/common/PropertyMap";
 
 export const PropertyDetails = () => {
   const { id }       = useParams();
@@ -250,6 +251,26 @@ export const PropertyDetails = () => {
                   </li>
                 ))}
               </ul>
+            </section>
+          )}
+
+          {/* Map */}
+          {(property.latitude && property.longitude) && (
+            <section className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+              <div className="px-6 pt-5 pb-3">
+                <h2 className="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">location_on</span>
+                  Location
+                </h2>
+                <p className="text-body-md text-on-surface-variant mt-1">{property.address}, {property.city}</p>
+              </div>
+              <PropertyMap
+                lat={property.latitude}
+                lng={property.longitude}
+                title={property.title}
+                address={`${property.address}, ${property.city}`}
+                height="280px"
+              />
             </section>
           )}
         </div>

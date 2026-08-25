@@ -27,6 +27,7 @@ export const EditTenantProfile = () => {
   const [major,      setMajor]      = useState(currentUser?.major      || "");
   const [age,        setAge]        = useState(currentUser?.age        || "");
   const [gender,     setGender]     = useState(currentUser?.gender     || "Male");
+  const [city,       setCity]       = useState(currentUser?.city       || "");
   // Budget stored as two integers in DB — display as range selector
   const [budgetMin,  setBudgetMin]  = useState(currentUser?.budget_min || 500);
   const [budgetMax,  setBudgetMax]  = useState(currentUser?.budget_max || 1200);
@@ -85,6 +86,7 @@ export const EditTenantProfile = () => {
         major:      major.trim() || null,
         age:        Number(age) || null,
         gender:     gender || null,
+        city:       city.trim() || null,
         budget_min: Number(budgetMin) || null,
         budget_max: Number(budgetMax) || null,
         bio:        bio.trim() || null,
@@ -99,6 +101,7 @@ export const EditTenantProfile = () => {
         major:      data.user.major,
         age:        data.user.age,
         gender:     data.user.gender,
+        city:       data.user.city,
         budget_min: data.user.budget_min,
         budget_max: data.user.budget_max,
         bio:        data.user.bio,
@@ -179,6 +182,11 @@ export const EditTenantProfile = () => {
             label="Gender" value={gender}
             onChange={e => setGender(e.target.value)}
             options={genderOptions}
+          />
+          <Input
+            label="City" value={city}
+            onChange={e => setCity(e.target.value)}
+            placeholder="e.g. Metro City"
           />
         </div>
 
