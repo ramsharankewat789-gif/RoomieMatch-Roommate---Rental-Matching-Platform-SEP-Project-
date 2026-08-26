@@ -47,7 +47,7 @@ export const AdminNotifications = () => {
               key={notif.id}
               onClick={() => handleNotificationClick(notif)}
               className={`p-5 flex justify-between gap-4 cursor-pointer hover:bg-surface-container-low transition-colors select-none ${
-                !notif.isRead ? "bg-primary-container/5 border-l-4 border-primary" : ""
+                !notif.is_read ? "bg-primary-container/5 border-l-4 border-primary" : ""
               }`}
             >
               <div className="flex items-start gap-4 flex-1">
@@ -63,7 +63,7 @@ export const AdminNotifications = () => {
                       {notif.title}
                     </h3>
                     <span className="text-[10px] text-outline font-semibold">
-                      {new Date(notif.createdAt).toLocaleDateString()}
+                      {notif.created_at ? new Date(notif.created_at).toLocaleDateString() : ""}
                     </span>
                   </div>
                   <p className="text-body-md text-on-surface-variant leading-relaxed">
