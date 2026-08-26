@@ -1,6 +1,6 @@
 # RoomieMatch — Roommate & Rental Matching Platform
 
-RoomieMatch is a full-stack web application built for university students to find compatible roommates and rental properties near campus. Any registered user can both search for rooms **and** list their own properties — there is one unified account type with access to all features.
+RoomieMatch is a full-stack web application that helps university students find compatible roommates and verified rental properties. Any registered user can search for rooms **and** list their own properties — there is one unified account type with access to all features.
 
 ---
 
@@ -10,11 +10,12 @@ RoomieMatch is a full-stack web application built for university students to fin
 |---|---|
 | Frontend | React 19, React Router 7, Tailwind CSS, Vite |
 | Backend | Node.js 18+, Express 4 |
-| Database | MySQL 8 / MariaDB 10.4 (via mysql2/promise) |
+| Database | MySQL 8 / MariaDB 10.4 (`mysql2/promise`) |
 | Authentication | JWT (HS256), Google OAuth 2.0, Email OTP |
+| Maps | Leaflet + OpenStreetMap (no API key required) |
 | File Uploads | Multer (profile images, property photos, verification docs) |
 | Email | Nodemailer (SMTP / Gmail App Password) |
-| Security | Helmet, bcryptjs, express-rate-limit, CORS |
+| Security | Helmet, bcryptjs (salt 10), express-rate-limit, CORS |
 | Charts | Chart.js, react-chartjs-2 |
 
 ---
@@ -24,27 +25,24 @@ RoomieMatch is a full-stack web application built for university students to fin
 ```
 RoomieMatch/
 ├── apps/
-│   ├── client/                     # User-facing React app (port 5173)
-│   │   └── src/
-│   │       ├── components/layout/  # Navbar, UserSidebar
-│   │       ├── layouts/            # PublicLayout, UserLayout
-│   │       ├── pages/
-│   │       │   ├── auth/           # Login, Register, OTP, ForgotPassword, ResetPassword
-│   │       │   ├── tenant/         # Dashboard, PropertySearch, PropertyDetails,
-│   │       │   │                   # Applications, Favorites, Messages, Reviews,
-│   │       │   │                   # RoommateSearch, RoommateProfile, TenantProfile,
-│   │       │   │                   # EditTenantProfile, TenantVerification, Notifications
-│   │       │   ├── owner/          # MyProperties, AddProperty, EditProperty,
-│   │       │   │                   # OwnerApplications, OwnerMessages, OwnerReviews
-│   │       │   └── public/         # LandingPage
-│   │       └── routes/             # UserRoutes (all routes unified — no role split)
+│   ├── client/                     # User app (port 5173)
+│   │   └── src/pages/
+│   │       ├── auth/               # Login, Register, OTP, ForgotPassword, ResetPassword,
+│   │       │                       # EmailVerification
+│   │       ├── tenant/             # Dashboard, PropertySearch, PropertyDetails,
+│   │       │                       # Applications, ApplicationDetails, Favorites,
+│   │       │                       # Messages, Reviews, RoommateSearch, RoommateProfile,
+│   │       │                       # TenantProfile, EditTenantProfile, LifestylePreferences,
+│   │       │                       # TenantVerification, Notifications
+│   │       └── owner/              # MyProperties, AddProperty, EditProperty,
+│   │                               # OwnerPropertyDetails, OwnerApplications,
+│   │                               # OwnerApplicationDetails, OwnerMessages, OwnerReviews,
+│   │                               # OwnerVerification
 │   │
-│   └── admin/                      # Admin React app (port 5174)
-│       └── src/
-│           ├── layouts/            # AdminLayout
-│           └── pages/
-│               ├── auth/           # Admin LoginPage, OtpVerificationPage
-│               └── admin/          # Dashboard, UserManagement, UserDetails,
+│   └── admin/                      # Admin app (port 5174)
+│       └── src/pages/
+│           ├── auth/               # LoginPage, OtpVerificationPage
+│           └── admin/              # AdminDashboard, UserManagement, UserDetails,
 │                                   # PropertyManagement, AdminPropertyDetails,
 │                                   # VerificationManagement, ReportsManagement,
 │                                   # ReportsDetails, Analytics, AdminNotifications
@@ -54,78 +52,74 @@ RoomieMatch/
 │   │   ├── controllers/            # authController, userController, propertyController,
 │   │   │                           # applicationController, uploadController,
 │   │   │                           # notificationController, favouriteController,
-│   │   │                           # reportController, adminController,
-│   │   │                           # messageController, reviewController,
+│   │   │                           # reportController, adminController, messageController,
+│   │   │                           # reviewController, compatibilityController,
 │   │   │                           # passwordController
 │   │   ├── routes/                 # One route file per controller
 │   │   ├── middleware/
-│   │   │   ├── auth.js             # requireAuth, requireAdmin JWT middleware
-│   │   │   └── upload.js           # Multer config (profiles, properties, verifications)
+│   │   │   ├── auth.js             # requireAuth, requireAdmin
+│   │   │   └── upload.js           # Multer (profiles, properties, verifications)
 │   │   ├── services/
-│   │   │   ├── emailService.js     # Nodemailer SMTP wrapper
-│   │   │   └── otpService.js       # CSPRNG OTP generation + bcrypt hashing
+│   │   │   ├── emailService.js     # OTP emails + email verification links
+│   │   │   └── otpService.js       # CSPRNG OTP + bcrypt hashing
 │   │   └── database/
 │   │       ├── db.js               # mysql2/promise connection pool
-│   │       ├── init.js             # Startup connectivity test
-│   │       ├── migrate.js          # Creates all 20 tables (safe to re-run)
-│   │       └── seed.js             # Inserts demo data
-│   ├── uploads/                    # Uploaded files (gitignored)
-│   │   ├── profiles/
-│   │   ├── properties/
-│   │   └── verifications/
-│   └── package.json
+│   │       ├── migrate.js          # Creates all 22 tables (safe to re-run)
+│   │       └── seed.js             # Demo data (5 users, 4 properties, applications)
+│   └── uploads/                    # Uploaded files (gitignored)
 │
-├── shared/                         # Code shared between client and admin apps
+├── shared/                         # Code shared between client and admin
 │   ├── components/common/          # Avatar, Button, Input, Modal, Select, Textarea,
-│   │                               # Badge, StatusBadge, Rating, EmptyState, ImageUpload
+│   │                               # Badge, StatusBadge, Rating, EmptyState,
+│   │                               # ImageUpload, PropertyMap (Leaflet)
 │   ├── context/
-│   │   ├── AuthContext.jsx         # JWT auth — login, register, Google OAuth, rehydration
-│   │   ├── NotificationContext.jsx # Real-time notification polling (30s interval)
-│   │   └── SocketContext.jsx       # Messaging context (15s/8s conversation polling)
+│   │   ├── AuthContext.jsx         # JWT auth — real API login, register, rehydration
+│   │   ├── NotificationContext.jsx # Real-time polling (30s), mark read/delete
+│   │   └── SocketContext.jsx       # Messaging (15s conv poll, 8s message poll)
 │   ├── hooks/
 │   │   ├── useAuth.js
-│   │   ├── useProperties.js        # GET/POST/PUT/DELETE /api/properties
-│   │   ├── useApplications.js      # GET/POST/PATCH/DELETE /api/applications
-│   │   ├── useMessages.js          # Wraps SocketContext for message pages
-│   │   └── useRoommates.js         # Fetches users + computes compatibility score
-│   ├── services/
-│   │   └── api.js                  # All 50+ API functions — single source of truth
-│   └── data/                       # Legacy mock files (no longer imported by any page)
+│   │   ├── useProperties.js        # Real API — CRUD, search, images
+│   │   ├── useApplications.js      # Real API — submit, approve, reject, cancel
+│   │   ├── useMessages.js          # Wraps SocketContext
+│   │   └── useRoommates.js         # Real API + PRD-weighted compatibility scoring
+│   └── services/
+│       └── api.js                  # 60+ typed API functions — single source of truth
 │
 ├── .env.example                    # Backend environment variables template
 ├── .env.client                     # Frontend environment variables template
-├── package.json                    # Root — frontend scripts and shared dependencies
 └── README.md
 ```
 
 ---
 
-## Database Schema
+## Database Schema — 22 Tables
 
-The database contains **20 tables**. All created automatically by `npm run db:migrate`.
+All tables created automatically by `npm run db:migrate`.
 
-| Table | Purpose |
-|---|---|
-| `users` | All accounts — unified role (`user` or `admin`) |
-| `user_preferences` | Lifestyle preferences (smoke, pets, sleep, etc.) |
-| `user_hobbies` | Hobby tags per user |
-| `password_reset_tokens` | Forgot-password secure tokens |
-| `otp_verifications` | Email OTP codes (hashed, 5-min expiry) |
-| `google_auth_pending` | Temporary Google OAuth sessions before OTP |
-| `verification_docs` | Identity document uploads |
-| `properties` | Rental listings |
-| `property_amenities` | Amenity tags per property |
-| `property_rules` | House rules per property |
-| `property_images` | Property photos (primary flag) |
-| `applications` | Rental applications with history |
-| `application_history` | Audit trail for application status changes |
-| `conversations` | Message threads between two users |
-| `conversation_participants` | User ↔ conversation junction |
-| `messages` | Individual messages with read receipts |
-| `notifications` | In-app notifications |
-| `reviews` | Property and user reviews with ratings |
-| `reports` | Abuse / content reports |
-| `favourites` | Saved properties per user |
+| # | Table | Purpose |
+|---|---|---|
+| 1 | `users` | All accounts — unified `user`/`admin` role |
+| 2 | `user_preferences` | 10 lifestyle fields (smoke, pet, cleanliness, sleep, social, cooking, **drinking, guests, food, working_hours**) |
+| 3 | `user_hobbies` | Hobby tags per user |
+| 4 | `password_reset_tokens` | Forgot-password secure tokens (bcrypt, 1hr) |
+| 5 | `otp_verifications` | Email OTP (CSPRNG, bcrypt, 5min, max 5 attempts) |
+| 6 | `email_verification_tokens` | Email address verification tokens (24hr) |
+| 7 | `google_auth_pending` | Temporary Google OAuth sessions before OTP |
+| 8 | `verification_docs` | Identity document uploads (PENDING/APPROVED/REJECTED) |
+| 9 | `properties` | Rental listings with lat/lng coordinates |
+| 10 | `property_amenities` | Amenity tags per property |
+| 11 | `property_rules` | House rules per property |
+| 12 | `property_images` | Property photos (primary flag, sort order) |
+| 13 | `applications` | Rental applications with status history |
+| 14 | `application_history` | Audit trail for application status changes |
+| 15 | `conversations` | Message threads between two users |
+| 16 | `conversation_participants` | User ↔ conversation junction |
+| 17 | `messages` | Individual messages with read receipts |
+| 18 | `notifications` | In-app notifications (auto-created on key events) |
+| 19 | `reviews` | Property and user reviews with star ratings |
+| 20 | `reports` | Abuse/content reports (PENDING/RESOLVED/DISMISSED) |
+| 21 | `favourites` | Saved properties per user |
+| 22 | `compatibility_scores` | Persisted roommate compatibility scores (PRD weights) |
 
 ---
 
@@ -134,7 +128,7 @@ The database contains **20 tables**. All created automatically by `npm run db:mi
 ### Prerequisites
 
 - **Node.js** 18+ — [nodejs.org](https://nodejs.org)
-- **MySQL** 8.0+ or **MariaDB** 10.4+ — [XAMPP](https://www.apachefriends.org) is the easiest option on Windows
+- **MySQL 8** or **MariaDB 10.4+** — [XAMPP](https://www.apachefriends.org) recommended on Windows
 - **Git**
 
 ---
@@ -151,7 +145,7 @@ cd RoomieMatch-Roommate---Rental-Matching-Platform-SEP-Project-
 ### 2. Install Dependencies
 
 ```bash
-# Root dependencies (frontend)
+# Root dependencies (frontend + Leaflet)
 npm install
 
 # Backend dependencies
@@ -166,24 +160,24 @@ cd ..
 
 #### Backend — create `server/.env`
 
-Copy the example file and fill in your values:
-
 ```bash
 cp .env.example server/.env
 ```
+
+Edit `server/.env`:
 
 ```dotenv
 PORT=4000
 NODE_ENV=development
 
-# MySQL / MariaDB
+# MySQL / MariaDB — leave DB_PASSWORD empty for XAMPP default
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
 DB_NAME=roomiematch
 
-# JWT
+# JWT — change this to a long random string in production
 JWT_SECRET=change_this_to_a_long_random_string
 JWT_EXPIRES_IN=7d
 
@@ -216,6 +210,8 @@ MAX_PROPERTY_IMAGES=6
 cp .env.client .env
 ```
 
+Edit `.env`:
+
 ```dotenv
 VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
 VITE_API_URL=http://localhost:4000/api
@@ -228,10 +224,9 @@ VITE_API_URL=http://localhost:4000/api
 **Using XAMPP (Windows):**
 1. Open XAMPP Control Panel
 2. Click **Start** next to MySQL
-3. MySQL will be running on `localhost:3306`
 
-**Using command line:**
-```bash
+**Command line:**
+```powershell
 C:\xampp\mysql\bin\mysqld.exe --console
 ```
 
@@ -241,8 +236,8 @@ C:\xampp\mysql\bin\mysqld.exe --console
 
 ```bash
 cd server
-npm run db:migrate    # Creates all 20 tables
-npm run db:seed       # Inserts demo accounts and properties
+npm run db:migrate    # Creates all 22 tables
+npm run db:seed       # Inserts demo users, properties, applications
 cd ..
 ```
 
@@ -252,64 +247,104 @@ cd ..
 
 Open **three separate terminals**:
 
-**Terminal 1 — Backend API:**
 ```bash
-cd server
-npm run dev
+# Terminal 1 — Backend API
+cd server && npm run dev
 # → http://localhost:4000/api
 # → http://localhost:4000/api/health
-```
 
-**Terminal 2 — Client App (Users):**
-```bash
+# Terminal 2 — Client App
 npm run dev:client
 # → http://localhost:5173
-```
 
-**Terminal 3 — Admin App:**
-```bash
+# Terminal 3 — Admin App
 npm run dev:admin
 # → http://localhost:5174
 ```
 
 ---
 
-## Demo Accounts
+## Login Credentials
 
-All demo accounts use the password: **`password123`**
+### Client App (`http://localhost:5173`)
 
-| Email | Role | Notes |
-|---|---|---|
-| `admin@roomiematch.com` | Administrator | Admin panel (port 5174) |
-| `alex@user.com` | User | Verified — can search and list |
-| `sarah@user.com` | User | Verified — has 3 listed properties |
-| `marcus@user.com` | User | Verified |
-| `chloe@user.com` | User | Unverified — pending ID review |
+All demo accounts use password: **`password123`**
 
-> Every user account has access to **all features** — searching for rooms, applying, listing properties, and messaging. There is no separate tenant or owner role.
+| Email | Notes |
+|---|---|
+| `alex@user.com` | Verified user — can search AND list properties |
+| `sarah@user.com` | Verified user — has 3 listed properties |
+| `marcus@user.com` | Verified user |
+| `chloe@user.com` | Unverified user (pending ID review) |
+
+### Admin Panel (`http://localhost:5174`)
+
+| Email | Notes |
+|---|---|
+| `admin@roomiematch.com` | Full admin access — use on port 5174 only |
+
+> **Important:** Admin accounts are blocked on the client app (port 5173). Regular user accounts are blocked on the admin panel (port 5174). Role enforcement happens both in the frontend (redirect with error) and backend (`requireAdmin` middleware → 403).
 
 ---
 
 ## How to Access the Database
 
-**Option 1 — phpMyAdmin (visual, browser-based)**
+**Option 1 — phpMyAdmin (browser, visual)**
 1. Start MySQL via XAMPP
-2. Open `http://localhost/phpmyadmin` in your browser
-3. Click **roomiematch** in the left panel
+2. Open `http://localhost/phpmyadmin`
+3. Click **roomiematch** in the left sidebar
 
-**Option 2 — MySQL Command Line**
-```bash
+**Option 2 — MySQL command line**
+```powershell
 C:\xampp\mysql\bin\mysql.exe -u root roomiematch
 ```
 ```sql
 SHOW TABLES;
 SELECT * FROM users;
-SELECT * FROM properties;
+SELECT name, email, role FROM users;
+SELECT title, price, city, latitude, longitude FROM properties;
 ```
 
-**Option 3 — VS Code Extension**
-Install **Database Client** (by Weijan Chen), connect with:
+**Option 3 — VS Code**
+Install **Database Client** (by Weijan Chen), connect:
 - Host: `localhost` · Port: `3306` · User: `root` · Password: *(blank)* · Database: `roomiematch`
+
+**Reset to demo data:**
+```bash
+cd server
+npm run db:migrate   # safe — uses CREATE IF NOT EXISTS
+npm run db:seed      # idempotent — uses INSERT ON DUPLICATE KEY UPDATE
+```
+
+---
+
+## Login Flow — How It Works
+
+### Email / Password (Both Apps)
+
+1. User submits email + password to `POST /api/auth/login`
+2. Backend verifies bcrypt hash, returns JWT + full user object
+3. `AuthContext` stores JWT in `localStorage('roomiematch_jwt')`
+4. On page reload, `AuthContext` calls `GET /api/auth/me` to rehydrate session
+5. Expired or revoked JWTs return 401 — user is redirected to login
+
+### Google OAuth
+
+1. User clicks "Continue with Google" → Google One Tap popup
+2. Google returns an ID token (signed JWT)
+3. Frontend sends token to `POST /api/auth/google`
+4. Backend validates token server-side via `google-auth-library`
+5. Backend generates a 6-digit OTP and emails it to the verified Gmail address
+6. User is redirected to `/verify-otp` to enter the code
+7. `POST /api/auth/otp/verify` returns JWT on success
+
+### Forgot Password
+
+1. User submits email to `POST /api/auth/forgot-password`
+2. Backend always returns 200 (prevents email enumeration)
+3. If email exists, a reset link is sent: `/reset-password?token=...&email=...`
+4. User clicks link → `ResetPasswordPage` calls `POST /api/auth/reset-password`
+5. Token is bcrypt-hashed, single-use, expires in 1 hour
 
 ---
 
@@ -320,125 +355,173 @@ All endpoints are served from `http://localhost:4000/api`.
 ### Authentication
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/auth/register` | — | Register new account |
+| POST | `/auth/register` | — | Register (unified role) |
 | POST | `/auth/login` | — | Email/password login |
-| POST | `/auth/google` | — | Google OAuth → OTP dispatch |
-| POST | `/auth/otp/verify` | — | Verify OTP → receive JWT |
+| POST | `/auth/google` | — | Google ID token → OTP |
+| POST | `/auth/otp/verify` | — | OTP → JWT |
 | POST | `/auth/otp/resend` | — | Resend OTP (60s cooldown) |
-| GET | `/auth/me` | JWT | Current user profile |
+| GET | `/auth/me` | JWT | Current user + preferences + hobbies |
 | POST | `/auth/forgot-password` | — | Send reset email |
 | POST | `/auth/reset-password` | — | Reset with token |
-| PATCH | `/auth/change-password` | JWT | Change password |
+| PATCH | `/auth/change-password` | JWT | Change while authenticated |
+| POST | `/auth/send-verification` | JWT | Send email verification link |
+| GET | `/auth/verify-email` | — | Confirm email from link |
 
 ### Users
-| Method | Endpoint | Auth | Description |
+| Method | Endpoint | Auth | Notes |
 |---|---|---|---|
-| GET | `/users` | Admin | List users (paginated, searchable) |
-| GET | `/users/:id` | JWT | Get user profile |
-| PATCH | `/users/:id` | JWT | Update profile |
+| GET | `/users` | JWT | Admin: full list with emails. Non-admin: public-safe subset for roommate matching (no emails) |
+| GET | `/users/:id` | JWT | Full profile with preferences + hobbies |
+| PATCH | `/users/:id` | JWT | Update profile — own only (admin: any) |
 | DELETE | `/users/:id` | Admin | Delete user |
 
 ### Properties
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/properties` | Optional | Search / list properties |
-| POST | `/properties` | JWT | Create a listing |
-| GET | `/properties/:id` | Optional | Property detail |
-| PUT | `/properties/:id` | JWT | Update listing |
-| DELETE | `/properties/:id` | JWT | Delete listing |
+| GET | `/properties` | Optional | Search with filters: search, city, type, minPrice, maxPrice, bedrooms, verified, ownerId |
+| POST | `/properties` | JWT | Create listing (any user) |
+| GET | `/properties/:id` | Optional | Full detail with images, amenities, rules, owner, lat/lng |
+| PUT | `/properties/:id` | JWT | Update (owner only) |
+| DELETE | `/properties/:id` | JWT | Delete (owner or admin) |
 | PATCH | `/properties/:id/verify` | Admin | Approve listing |
-| PATCH | `/properties/:id/status` | JWT | Toggle active/inactive |
-| POST | `/properties/:id/images` | JWT | Upload property images |
-| DELETE | `/properties/images/:id` | JWT | Delete an image |
+| PATCH | `/properties/:id/status` | JWT | Toggle active/inactive/rented |
+| POST | `/properties/:id/images` | JWT | Upload images (up to 6) |
+| DELETE | `/properties/images/:id` | JWT | Delete image |
+| PATCH | `/properties/images/:id/primary` | JWT | Set cover photo |
 
 ### Applications
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/applications` | JWT | List own applications |
-| POST | `/applications` | JWT | Submit application |
-| PATCH | `/applications/:id/status` | JWT | Approve / reject |
-| DELETE | `/applications/:id` | JWT | Cancel application |
+| GET | `/applications` | JWT | Tenant: own. Owner: received. Admin: all. Includes `history[]`, `owner_name`, `tenant_name` |
+| POST | `/applications` | JWT | Submit (tenant only, not to own property) |
+| GET | `/applications/:id` | JWT | Full detail with history, tenant, owner info |
+| PATCH | `/applications/:id/status` | JWT | Approve/reject (owner) |
+| DELETE | `/applications/:id` | JWT | Cancel (tenant) |
 
-### Uploads
+### File Uploads
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/profile` | JWT | Upload profile photo |
+| POST | `/profile` | JWT | Upload profile photo (5MB max) |
 | DELETE | `/profile` | JWT | Remove profile photo |
-| POST | `/verification` | JWT | Upload ID document |
+| POST | `/verification` | JWT | Upload ID document (10MB max, PDF/image) |
 | GET | `/verification/status` | JWT | Own verification status |
 | GET | `/verification/doc/:userId` | JWT | View document (admin-gated) |
-| POST | `/verification/:userId/approve` | Admin | Approve verification |
+| POST | `/verification/:userId/approve` | Admin | Approve with `is_verified=1` |
 | POST | `/verification/:userId/reject` | Admin | Reject with reason |
-| GET | `/verification/pending` | Admin | List pending verifications |
+| GET | `/verification/pending` | Admin | List pending submissions |
 
 ### Messaging
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/messages/conversations` | JWT | List conversations |
-| POST | `/messages/conversations` | JWT | Get or create thread |
-| GET | `/messages/conversations/:id/messages` | JWT | Get messages (marks read) |
-| POST | `/messages/conversations/:id/messages` | JWT | Send message |
-| PATCH | `/messages/conversations/:id/read` | JWT | Mark conversation read |
-| GET | `/messages/unread-count` | JWT | Total unread count |
+| GET | `/messages/unread-count` | JWT | Total unread across all threads |
+| GET | `/messages/conversations` | JWT | List threads (last message + unread count) |
+| POST | `/messages/conversations` | JWT | Get or create thread (idempotent) |
+| GET | `/messages/conversations/:id` | JWT | Conversation detail |
+| GET | `/messages/conversations/:id/messages` | JWT | Messages (auto-marks incoming as read) |
+| POST | `/messages/conversations/:id/messages` | JWT | Send message (rate limited 60/min) |
+| PATCH | `/messages/conversations/:id/read` | JWT | Mark conversation as read |
 
-### Notifications, Favourites, Reviews, Reports
+### Notifications
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/notifications` | JWT | List notifications |
+| GET | `/notifications` | JWT | List (snake_case fields: `is_read`, `created_at`, `reference_id`) |
+| PATCH | `/notifications/:id/read` | JWT | Mark one read |
 | PATCH | `/notifications/read-all` | JWT | Mark all read |
-| GET | `/favourites` | JWT | Saved properties |
-| POST | `/favourites` | JWT | Save a property |
-| DELETE | `/favourites/:propertyId` | JWT | Remove saved |
-| GET | `/reviews` | — | List reviews |
-| POST | `/reviews` | JWT | Submit a review |
-| POST | `/reports` | JWT | Submit a report |
-| GET | `/reports` | Admin | List all reports |
-| PATCH | `/reports/:id` | Admin | Resolve / dismiss |
+| DELETE | `/notifications/:id` | JWT | Delete |
 
-### Admin
+### Favourites, Reviews, Reports
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/admin/stats` | Admin | Dashboard statistics |
-| GET | `/admin/activity` | Admin | Recent activity feed |
+| GET | `/favourites` | JWT | Saved properties (with `cover_image`) |
+| POST | `/favourites` | JWT | Save (INSERT IGNORE — idempotent) |
+| GET | `/favourites/:propertyId/status` | JWT | `{ isFavourited: bool }` |
+| DELETE | `/favourites/:propertyId` | JWT | Remove |
+| GET | `/reviews` | — | Filter by `targetProperty`, `targetUser`, `reviewerId` |
+| POST | `/reviews` | JWT | Submit (rating 1–5, cannot self-review) |
+| POST | `/reports` | JWT | Submit abuse report |
+| GET | `/reports` | Admin | List with status filter |
+| GET | `/reports/:id` | Admin | Single report detail |
+| PATCH | `/reports/:id` | Admin | Resolve or dismiss |
+
+### Admin & Compatibility
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/admin/stats` | Admin | Users, properties, verifications, reports, revenue counts |
+| GET | `/admin/activity` | Admin | Recent users, properties, applications, reports |
+| GET | `/compatibility` | JWT | Stored compatibility scores for current user |
+| POST | `/compatibility/save` | JWT | Persist batch of computed scores to MySQL |
+
+---
+
+## Compatibility Matching — PRD Weights
+
+The roommate compatibility algorithm uses the weights specified in the PRD:
+
+| Factor | Weight | Source |
+|---|---|---|
+| Budget overlap | 30% | `budget_min` / `budget_max` range comparison |
+| Lifestyle preferences | 30% | smoke, pet, cleanliness, sleep, social, cooking, drinking, guests |
+| Shared interests/hobbies | 20% | Jaccard overlap of `user_hobbies` |
+| Location (city match) | 10% | `users.city` field |
+| Occupation (university/major) | 10% | `users.university` + `users.major` |
+
+Scores are computed client-side by `useRoommates.js` and **persisted to MySQL** via `POST /api/compatibility/save` after each calculation. Stored scores can be retrieved via `GET /api/compatibility`.
+
+---
+
+## Maps
+
+Property listings include **latitude** and **longitude** coordinates. The `PropertyMap` component (`shared/components/common/PropertyMap.jsx`) renders an OpenStreetMap map using **Leaflet** — no API key required.
+
+- **PropertySearch** — shows all search results on an interactive map above the property cards
+- **PropertyDetails** — shows the property's location on a map below house rules
 
 ---
 
 ## Features
 
-### For All Users
-- Register and log in with email/password or Google account
-- Verify identity by uploading a student ID or passport
-- Search properties by location, price, bedroom count, and type
+### All Users (both apps)
+- Register with email/password or Google OAuth
+- Verify student identity by uploading ID document
+- Search and filter properties (city, price, type, bedrooms, amenities)
+- View properties on an interactive Leaflet map
 - Save favourite properties
 - Apply for a rental with a personal message
-- List your own properties with photos, amenities, and rules
-- Manage received applications (approve or reject)
+- Track application status with full history timeline
+- List and manage own rental properties with photos
+- Accept or reject applications received for own listings
 - Message any other user directly
-- Rate and review properties and roommates
-- Find compatible roommates based on lifestyle preferences (smoking, pets, sleep schedule, cleanliness, cooking habits)
-- Receive in-app notifications for applications, messages, and verifications
+- Rate and review properties and roommates (1–5 stars)
+- Find compatible roommates using PRD-weighted scoring
+- Receive in-app notifications (messages, applications, verifications)
+- Email verification for account security
+- Forgot/reset password via email link
 
-### For Administrators
-- View platform-wide statistics (users, properties, pending verifications, reports)
-- Approve or reject identity verification documents
+### Administrators
+- View platform statistics (users, properties, verifications, reports, revenue)
+- Approve or reject identity verification documents (with rejection reason)
 - Approve or reject property listings before they go live
-- Manage user accounts
-- Review and resolve abuse reports
-- View analytics overview
+- Manage all user accounts (search, view, delete)
+- Review and resolve/dismiss abuse reports
+- View analytics overview and recent activity feed
 
 ---
 
 ## Security
 
-- Passwords hashed with **bcrypt** (salt rounds: 10)
-- JWTs signed with HS256 — validated against the database on every request
-- Google ID tokens verified server-side via `google-auth-library`
-- OTPs generated with `crypto.randomInt` (CSPRNG), stored as bcrypt hashes, expire in 5 minutes, max 5 attempts
-- Rate limiting on all auth routes
-- Verification documents served through an auth-gated endpoint — never exposed as static files
-- All database queries use parameterised statements (no SQL injection)
-- CORS restricted to known origins only
-- `Helmet` sets security headers on all responses
+| Feature | Implementation |
+|---|---|
+| Password hashing | bcrypt, salt rounds 10 |
+| JWT | HS256, validated against DB on every request (deleted users auto-rejected) |
+| Google tokens | Server-side `verifyIdToken` via `google-auth-library` |
+| OTP | `crypto.randomInt` (CSPRNG), bcrypt-hashed, 5min expiry, max 5 attempts |
+| Rate limiting | Auth: 20/15min, OTP: 10/5min, Password: 5/15min, Messages: 60/min |
+| Verification docs | Auth-gated endpoint — never served as static files |
+| SQL injection | Parameterised queries throughout — zero string interpolation |
+| Role separation | `requireAuth` + `requireAdmin` middleware; non-admins cannot access admin endpoints |
+| Privacy | Non-admin user list never exposes email addresses |
+| CORS | Restricted to known origins (`CLIENT_URL`, `ADMIN_URL`) |
+| Upload validation | MIME type + file extension both checked; UUID filenames |
 
 ---
 
@@ -449,8 +532,7 @@ All endpoints are served from `http://localhost:4000/api`.
 npm run build
 
 # Start backend in production mode
-cd server
-npm start
+cd server && npm start
 ```
 
 ---
@@ -458,26 +540,33 @@ npm start
 ## Troubleshooting
 
 **Server fails to start**
-- Make sure MySQL/MariaDB is running before starting the server
+- Ensure MySQL/MariaDB is running before starting `node src/index.js`
 - Check `server/.env` has correct `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-- Run `npm run db:migrate` to ensure all tables exist
+- Run `npm run db:migrate` if tables are missing
 
-**CORS errors in browser**
-- Confirm `CLIENT_URL=http://localhost:5173` and `ADMIN_URL=http://localhost:5174` in `server/.env`
+**Login not working**
+- Client app: use `alex@user.com` or `sarah@user.com` (not the admin account)
+- Admin panel: use `admin@roomiematch.com` (not a regular user account)
+- Ensure backend is running on port 4000 before attempting login
+- Check browser console for CORS or network errors
 
 **Google OAuth not working**
-- Add `http://localhost:5173` and `http://localhost:5174` as authorised origins in Google Cloud Console
-- Make sure `VITE_GOOGLE_CLIENT_ID` in root `.env` matches `GOOGLE_CLIENT_ID` in `server/.env`
+- Add `http://localhost:5173` and `http://localhost:5174` as authorised JavaScript origins in Google Cloud Console
+- Ensure `VITE_GOOGLE_CLIENT_ID` in root `.env` matches `GOOGLE_CLIENT_ID` in `server/.env`
 
-**OTP emails not arriving**
-- For Gmail: enable 2-factor authentication and generate an App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-- Use the 16-character App Password as `SMTP_PASSWORD`
+**OTP/email not arriving**
+- Enable 2-factor auth on Gmail and generate a 16-char App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+- Use the App Password as `SMTP_PASSWORD` in `server/.env`
 
 **Port already in use (Windows)**
 ```powershell
 netstat -ano | findstr :4000
 taskkill /PID <PID> /F
 ```
+
+**Rate limit hit during testing**
+- Auth endpoints: 20 requests per 15-minute window per IP
+- If blocked, wait 15 minutes or restart the server
 
 ---
 
