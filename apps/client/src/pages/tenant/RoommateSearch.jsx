@@ -26,11 +26,11 @@ export const RoommateSearch = () => {
     };
   }).sort((a, b) => b.compat.compatibilityScore - a.compat.compatibilityScore);
 
-  const handleChat = (roommateId, e) => {
+  const handleChat = async (roommateId, e) => {
     e.preventDefault();
     e.stopPropagation();
-    const threadId = getOrCreateThread(roommateId);
-    navigate(`/user/messages?thread=${threadId}`);
+    const threadId = await getOrCreateThread(roommateId);
+    if (threadId) navigate(`/user/messages?thread=${threadId}`);
   };
 
   // Filter logic
@@ -131,7 +131,7 @@ export const RoommateSearch = () => {
           {filteredRoommates.map((item) => (
             <Link
               key={item.id}
-              to={`/tenant/roommates/${item.id}`}
+              to={`/user/roommates/${item.id}`}
               className="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 flex flex-col justify-between hover:shadow-md transition-shadow relative group"
             >
               {/* Score Badge */}
@@ -181,7 +181,13 @@ export const RoommateSearch = () => {
 
               <div className="mt-6 pt-4 border-t border-outline-variant/60 flex justify-between items-center">
                 <span className="text-xs text-outline font-semibold">
-                  Budget: {item.budget}
+                  Budget: {
+                    item.budget_min && item.budget_max
+                      ? `$${item.budget_min} – $${item.budget_max}/mo`
+                      : item.budget_min
+                        ? `From $${item.budget_min}/mo`
+                        : "Not specified"
+                  }
                 </span>
                 
                 <div className="flex items-center gap-2">

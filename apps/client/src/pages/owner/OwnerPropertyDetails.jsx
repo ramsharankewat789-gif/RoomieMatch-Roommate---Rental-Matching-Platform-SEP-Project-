@@ -1,30 +1,87 @@
-import React, { useContext } from "react";
+/**
+ * OwnerPropertyDetails.jsx
+ *
+ * Loads property from GET /api/properties/:id (real API).
+ * Loads applications from useApplications (real API).
+ * Status toggle calls PATCH /api/properties/:id/status.
+ * Delete calls DELETE /api/properties/:id.
+ * All field names use snake_case from API.
+ */
+import React, { useState, useEffect, useContext } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
-import { useProperties } from "@shared/hooks/useProperties";
 import { useApplications } from "@shared/hooks/useApplications";
+import { apiGetProperty, apiUpdatePropertyStatus, apiDeleteProperty } from "@shared/services/api";
 import StatusBadge from "@shared/components/common/StatusBadge";
 import Button from "@shared/components/common/Button";
+import PropertyMap from "@shared/components/common/PropertyMap";
 
 export const OwnerPropertyDetails = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const { id }     = useParams();
+  const navigate   = useNavigate();
   const { currentUser } = useContext(AuthContext);
-  const { properties, editProperty, deleteProperty } = useProperties();
   const { applications } = useApplications();
 
-  const property = properties.find((p) => p.id === id && p.ownerId === currentUser?.id);
+  const [property,  setProperty]  = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [pageError, setPageError] = useState("");
+
+  useEffect(() => {
+    apiGetProperty(id)
+      .then(data => {
+        const p = data.property;
+        // Only owner can view this page
+        if (p.owner_id !== currentUser?.id) {
+          setPageError("You do not own this property.");
+          return;
+        }
+        setProperty(p);
+      })
+      .catch(err => setPageError(err.message || "Property not found."))
+      .finally(() => setLoading(false));
+  }, [id, currentUser?.id]);
+
   const pendingApps = applications.filter(
-    (a) => a.propertyId === id && a.ownerId === currentUser?.id && a.status === "pending"
+    a => (a.property_id || a.propertyId) === id && a.status === "pending"
   );
 
-  if (!property) {
+  const handleToggleAvailability = async () => {
+    const newStatus = property.status === "active" ? "inactive" : "active";
+    try {
+      await apiUpdatePropertyStatus(id, newStatus);
+      setProperty(prev => ({ ...prev, status: newStatus }));
+    } catch (err) {
+      alert(err.message || "Failed to update status.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this listing? This cannot be undone.")) return;
+    try {
+      await apiDeleteProperty(id);
+      navigate("/user/my-properties");
+    } catch (err) {
+      alert(err.message || "Failed to delete property.");
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="max-w-xl mx-auto py-12 text-center bg-surface-container-lowest border rounded-xl">
+      <div className="flex items-center justify-center h-48 text-on-surface-variant gap-2">
+        <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+        Loading property...
+      </div>
+    );
+  }
+
+  if (pageError || !property) {
+    return (
+      <div className="max-w-xl mx-auto py-12 text-center bg-surface-container-lowest border rounded-xl p-8">
         <span className="material-symbols-outlined text-[48px] text-error">warning</span>
         <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold mt-2">
           Property Not Found
         </h3>
+        <p className="text-body-md text-on-surface-variant mt-2">{pageError}</p>
         <Link to="/user/my-properties" className="mt-4 inline-block text-primary font-bold hover:underline">
           Back to My Properties
         </Link>
@@ -32,20 +89,11 @@ export const OwnerPropertyDetails = () => {
     );
   }
 
-  const handleToggleAvailability = () => {
-    const newStatus = property.status === "active" ? "inactive" : "active";
-    editProperty(property.id, { status: newStatus });
-  };
-
-  const handleDelete = () => {
-    if (window.confirm("Are you sure you want to delete this listing?")) {
-      deleteProperty(property.id);
-      navigate("/user/my-properties");
-    }
-  };
+  const verified   = property.is_verified === 1 || property.is_verified === true;
+  const coverImage = property.cover_image || property.images?.[0] || null;
 
   return (
-    <div className="space-y-section-margin max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <Link
@@ -62,7 +110,7 @@ export const OwnerPropertyDetails = () => {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <StatusBadge status={property.isVerified ? "verified" : "unverified"} />
+          <StatusBadge status={verified ? "verified" : "unverified"} />
           <StatusBadge status={property.status} />
           <Link
             to={`/user/my-properties/${property.id}/edit`}
@@ -74,11 +122,19 @@ export const OwnerPropertyDetails = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-card-gap">
-        <div className="lg:col-span-8 flex flex-col gap-card-gap">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8 flex flex-col gap-6">
+
+          {/* Image + availability toggle */}
           <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
-            <div className="relative h-[300px] md:h-[400px] w-full">
-              <img alt={property.title} className="w-full h-full object-cover" src={property.images[0]} />
+            <div className="relative h-[300px] md:h-[400px] w-full bg-surface-container">
+              {coverImage ? (
+                <img alt={property.title} className="w-full h-full object-cover" src={coverImage} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-outline">
+                  <span className="material-symbols-outlined text-[64px]">home_work</span>
+                </div>
+              )}
               <div className="absolute top-4 right-4 bg-surface-container-lowest/90 backdrop-blur-sm p-3 rounded-lg shadow-sm border border-outline-variant flex items-center gap-3">
                 <span className="font-label-md text-label-md text-on-surface">
                   {property.status === "active" ? "Currently Available" : "Not Available"}
@@ -116,13 +172,49 @@ export const OwnerPropertyDetails = () => {
             </div>
           </div>
 
+          {/* Description */}
           <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-outline-variant">
             <h2 className="font-headline-md text-headline-md text-on-surface mb-4">Property Description</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant">{property.description}</p>
+            <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+              {property.description || "No description provided."}
+            </p>
           </div>
+
+          {/* Amenities */}
+          {property.amenities?.length > 0 && (
+            <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-outline-variant">
+              <h2 className="font-headline-sm text-headline-sm text-on-surface mb-4">Amenities</h2>
+              <div className="flex flex-wrap gap-2">
+                {property.amenities.map(a => (
+                  <span key={a} className="bg-surface-container px-3 py-1.5 rounded-lg text-body-md text-on-surface border border-outline-variant/60 font-medium">{a}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Map */}
+          {property.latitude && property.longitude && (
+            <div className="rounded-xl overflow-hidden border border-outline-variant shadow-sm">
+              <div className="px-6 pt-5 pb-2">
+                <h2 className="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">location_on</span>
+                  Location
+                </h2>
+              </div>
+              <PropertyMap
+                lat={property.latitude}
+                lng={property.longitude}
+                title={property.title}
+                address={`${property.address}, ${property.city}`}
+                height="240px"
+              />
+            </div>
+          )}
         </div>
 
-        <div className="lg:col-span-4 flex flex-col gap-card-gap">
+        <div className="lg:col-span-4 flex flex-col gap-6">
+
+          {/* Applications */}
           <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-outline-variant">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-primary-container text-primary flex items-center justify-center">
@@ -141,6 +233,7 @@ export const OwnerPropertyDetails = () => {
             </Button>
           </div>
 
+          {/* Management */}
           <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-outline-variant">
             <h3 className="font-headline-sm text-headline-sm text-on-surface mb-4">Listing Management</h3>
             <Button variant="danger" onClick={handleDelete} className="w-full">

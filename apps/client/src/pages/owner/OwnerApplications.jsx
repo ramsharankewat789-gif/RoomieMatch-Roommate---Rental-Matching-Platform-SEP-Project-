@@ -20,7 +20,8 @@ export const OwnerApplications = () => {
   const [filterStatus, setFilterStatus] = useState("");
   const [selectedTimelineApp, setSelectedTimelineApp] = useState(null);
 
-  const myApps = applications.filter((a) => a.ownerId === currentUser?.id);
+  // API returns owner_id (snake_case)
+  const myApps = applications.filter((a) => (a.owner_id || a.ownerId) === currentUser?.id);
 
   const filteredApps = myApps.filter((a) => {
     if (filterStatus && a.status !== filterStatus) return false;
@@ -28,12 +29,13 @@ export const OwnerApplications = () => {
   });
 
   const getPropertyTitle = (propId) => {
-    return properties.find((p) => p.id === propId)?.title || "Unknown Property";
+    // API returns property_title directly on each application
+    return properties.find((p) => p.id === propId)?.title || "Property";
   };
 
-  const handleChat = (tenantId) => {
-    const threadId = getOrCreateThread(tenantId);
-    navigate(`/user/messages?thread=${threadId}`);
+  const handleChat = async (tenantId) => {
+    const threadId = await getOrCreateThread(tenantId);
+    if (threadId) navigate(`/user/messages?thread=${threadId}`);
   };
 
   const statusOptions = [
@@ -79,15 +81,15 @@ export const OwnerApplications = () => {
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-3">
                   <h3 className="font-label-md text-label-md text-primary font-bold">
-                    Applicant ID: {app.tenantId.toUpperCase()}
+                    {app.tenant_name || `Applicant: ${(app.tenant_id || app.tenantId || "").slice(0,8).toUpperCase()}`}
                   </h3>
                   <StatusBadge status={app.status} />
                 </div>
                 <h4 className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                  Property: {getPropertyTitle(app.propertyId)}
+                  Property: {app.property_title || getPropertyTitle(app.property_id || app.propertyId)}
                 </h4>
                 <p className="text-xs text-outline font-semibold">
-                  Submitted on {new Date(app.appliedAt).toLocaleDateString()}
+                  Submitted on {new Date(app.applied_at || app.appliedAt).toLocaleDateString()}
                 </p>
                 <div className="bg-surface p-4 rounded-lg border border-outline-variant/60 italic text-body-md text-on-surface-variant leading-relaxed mt-3">
                   "{app.message}"
@@ -111,7 +113,7 @@ export const OwnerApplications = () => {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleChat(app.tenantId)}
+                    onClick={() => handleChat(app.tenant_id || app.tenantId)}
                     className="px-4 py-2 border border-outline text-primary font-label-sm text-label-sm rounded-lg hover:bg-surface-container-low transition-colors flex items-center gap-1 font-bold"
                   >
                     <span className="material-symbols-outlined text-sm">chat</span>
@@ -122,14 +124,14 @@ export const OwnerApplications = () => {
                     <>
                       <Button
                         variant="danger"
-                        onClick={() => updateApplicationStatus(app.id, "rejected", currentUser.name)}
+                        onClick={() => updateApplicationStatus(app.id, "rejected")}
                         className="px-4 py-2"
                       >
                         Reject
                       </Button>
                       <Button
                         variant="secondary"
-                        onClick={() => updateApplicationStatus(app.id, "approved", currentUser.name)}
+                        onClick={() => updateApplicationStatus(app.id, "approved")}
                         className="px-4 py-2"
                       >
                         Approve
@@ -159,7 +161,7 @@ export const OwnerApplications = () => {
             </div>
 
             <div className="relative border-l-2 border-outline-variant ml-4 pl-6 space-y-6">
-              {selectedTimelineApp.history.map((hist, i) => (
+              {(selectedTimelineApp.history || []).map((hist, i) => (
                 <div key={i} className="relative">
                   <span className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-primary border-2 border-surface-container-lowest"></span>
                   <div>
@@ -167,7 +169,7 @@ export const OwnerApplications = () => {
                       {hist.status}
                     </span>
                     <span className="text-xs text-outline block mt-0.5">
-                      {new Date(hist.date).toLocaleString()}
+                      {new Date(hist.changed_at || hist.date).toLocaleString()}
                     </span>
                     <p className="text-body-md text-on-surface-variant mt-1">
                       {hist.label}

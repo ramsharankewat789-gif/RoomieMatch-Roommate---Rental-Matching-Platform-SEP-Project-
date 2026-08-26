@@ -35,7 +35,9 @@ async function buildApplicationResponse(appId) {
   );
 
   const property = await get(
-    "SELECT id, title, address, city, price FROM properties WHERE id = ?",
+    `SELECT p.id, p.title, p.address, p.city, p.price,
+            (SELECT image_path FROM property_images WHERE property_id=p.id AND is_primary=1 LIMIT 1) AS cover_image
+     FROM properties p WHERE p.id = ?`,
     [app.property_id]
   );
 
@@ -44,13 +46,25 @@ async function buildApplicationResponse(appId) {
     [app.tenant_id]
   );
 
+  const owner = await get(
+    "SELECT id, name, profile_image FROM users WHERE id = ?",
+    [app.owner_id]
+  );
+
   return {
     ...app,
-    applied_at: isoDate(app.applied_at),
-    updated_at: isoDate(app.updated_at),
-    history:    history.map(h => ({ ...h, changed_at: isoDate(h.changed_at) })),
-    property:   property || null,
-    tenant:     tenant   || null
+    applied_at:      isoDate(app.applied_at),
+    updated_at:      isoDate(app.updated_at),
+    history:         history.map(h => ({ ...h, changed_at: isoDate(h.changed_at) })),
+    property:        property || null,
+    property_title:  property?.title   || null,
+    property_address: property?.address || null,
+    property_price:  property?.price   || null,
+    tenant:          tenant  || null,
+    tenant_name:     tenant?.name  || null,
+    tenant_image:    tenant?.profile_image || null,
+    owner_name:      owner?.name   || null,
+    owner_image:     owner?.profile_image  || null,
   };
 }
 
@@ -98,10 +112,12 @@ async function listApplications(req, res) {
               p.title AS property_title, p.address AS property_address,
               p.price AS property_price,
               u.name AS tenant_name, u.profile_image AS tenant_image,
-              u.is_verified AS tenant_verified
+              u.is_verified AS tenant_verified,
+              o.name AS owner_name
        FROM applications a
        JOIN properties p ON a.property_id = p.id
        JOIN users      u ON a.tenant_id   = u.id
+       JOIN users      o ON a.owner_id    = o.id
        ${where}
        ORDER BY a.applied_at DESC
        LIMIT ? OFFSET ?`,

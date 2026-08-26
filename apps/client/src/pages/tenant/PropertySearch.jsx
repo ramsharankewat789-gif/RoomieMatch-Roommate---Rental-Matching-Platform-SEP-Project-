@@ -55,25 +55,6 @@ export const PropertySearch = () => {
       console.warn("Favourite toggle failed:", err.message);
     }
   };
-    if (!currentUser) return;
-    
-    const favs = currentUser.favorites || [];
-    const isFav = favs.includes(propId);
-    
-    let newFavs;
-    if (isFav) {
-      newFavs = favs.filter(id => id !== propId);
-    } else {
-      newFavs = [...favs, propId];
-    }
-    
-    updateProfile({ favorites: newFavs });
-  };
-
-  const isFavorite = (propId) => {
-    return (currentUser?.favorites || []).includes(propId);
-  };
-
   // Filter logic
   const filteredProperties = properties.filter((p) => {
     if (p.status !== "active") return false;
