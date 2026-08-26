@@ -1,18 +1,20 @@
 /**
  * OwnerMessages.jsx
  *
- * Identical to Messages.jsx in structure — both use the same real-API hook.
- * Kept as a separate page so it can sit inside the owner route group.
+ * Identical to Messages.jsx — uses the same Socket.io-powered real-time chat.
+ * Kept as a separate page so it sits inside the owner route group.
  */
-import React, { useState, useContext, useEffect, useRef } from "react";
+import React, { useState, useContext, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
+import { SocketContext } from "@shared/context/SocketContext";
 import { useMessages } from "@shared/hooks/useMessages";
 import Avatar from "@shared/components/common/Avatar";
 import Button from "@shared/components/common/Button";
 
 export const OwnerMessages = () => {
   const { currentUser } = useContext(AuthContext);
+  const { isConnected, typingUsers, sendTyping } = useContext(SocketContext);
   const {
     threads,
     loadingConversations,
@@ -27,7 +29,9 @@ export const OwnerMessages = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeThreadId, setActiveThreadId] = useState("");
   const [inputText, setInputText]           = useState("");
+  const [typingTimeout, setTypingTimeout]   = useState(null);
   const messagesEndRef                      = useRef(null);
+  const inputRef                            = useRef(null);
 
   useEffect(() => {
     const threadParam = searchParams.get("thread");
@@ -50,31 +54,54 @@ export const OwnerMessages = () => {
     setActiveThreadId(threadId);
     setSearchParams({ thread: threadId });
     openConversation(threadId);
+    inputRef.current?.focus();
   };
 
-  const handleSend = async (e) => {
+  const handleSend = (e) => {
     e.preventDefault();
     if (!inputText.trim() || !activeThreadId) return;
-    await sendMessage(activeThreadId, inputText);
+    sendMessage(activeThreadId, inputText);
     setInputText("");
+    sendTyping(activeThreadId, false);
+    if (typingTimeout) { clearTimeout(typingTimeout); setTypingTimeout(null); }
   };
+
+  const handleInputChange = useCallback((e) => {
+    setInputText(e.target.value);
+    if (!activeThreadId) return;
+    sendTyping(activeThreadId, true);
+    if (typingTimeout) clearTimeout(typingTimeout);
+    const t = setTimeout(() => {
+      sendTyping(activeThreadId, false);
+      setTypingTimeout(null);
+    }, 2000);
+    setTypingTimeout(t);
+  }, [activeThreadId, sendTyping, typingTimeout]);
 
   const getRecipient = (thread) => {
     const data = thread.participants_data || [];
     return data.find(p => p.id !== currentUser?.id) || null;
   };
 
-  const activeThread   = getThread(activeThreadId);
+  const activeThread    = getThread(activeThreadId);
   const displayMessages = activeConvId === activeThreadId ? activeMessages : [];
+  const activeTypers    = (typingUsers[activeThreadId] || []).filter(u => u.userId !== currentUser?.id);
 
   return (
     <div className="h-[calc(100vh-130px)] max-w-6xl mx-auto bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm flex overflow-hidden">
 
-      {/* Thread List Sidebar */}
+      {/* Sidebar */}
       <div className="w-80 border-r border-outline-variant flex flex-col shrink-0">
-        <div className="p-4 border-b border-outline-variant bg-surface-container-low">
+        <div className="p-4 border-b border-outline-variant bg-surface-container-low flex items-center justify-between">
           <h2 className="font-headline-sm text-headline-sm text-on-surface">Messages</h2>
+          <span className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+            isConnected ? "bg-secondary-container/40 text-secondary" : "bg-error-container/40 text-error"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-secondary" : "bg-error"}`} />
+            {isConnected ? "Live" : "Offline"}
+          </span>
         </div>
+
         <div className="flex-grow overflow-y-auto divide-y divide-outline-variant/60">
           {loadingConversations && threads.length === 0 ? (
             <div className="p-8 text-center text-body-md text-on-surface-variant flex items-center justify-center gap-2">
@@ -90,6 +117,7 @@ export const OwnerMessages = () => {
               const recipient = getRecipient(thread);
               const isSel     = thread.id === activeThreadId;
               const lastMsg   = thread.messages?.[thread.messages.length - 1];
+              const hasTyping = (typingUsers[thread.id] || []).some(u => u.userId !== currentUser?.id);
               return (
                 <button
                   key={thread.id}
@@ -104,19 +132,27 @@ export const OwnerMessages = () => {
                       <span className="font-label-md text-label-md text-on-surface font-bold truncate">
                         {recipient?.name || "User"}
                       </span>
-                      {lastMsg && (
-                        <span className="text-[10px] text-outline font-medium">
+                      {lastMsg && !hasTyping && (
+                        <span className="text-[10px] text-outline font-medium shrink-0 ml-1">
                           {new Date(lastMsg.timestamp || lastMsg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-outline font-semibold uppercase mt-0.5">
-                      {recipient?.role || ""}
-                    </p>
                     <div className="flex items-center justify-between mt-1">
-                      <p className="text-xs text-on-surface-variant truncate flex-1">
-                        {lastMsg ? (lastMsg.text || lastMsg.body) : "No messages yet."}
-                      </p>
+                      {hasTyping ? (
+                        <p className="text-xs text-primary font-semibold italic flex items-center gap-1">
+                          <span className="flex gap-0.5">
+                            <span className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                            <span className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                            <span className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                          </span>
+                          typing...
+                        </p>
+                      ) : (
+                        <p className="text-xs text-on-surface-variant truncate flex-1">
+                          {lastMsg ? (lastMsg.text || lastMsg.body) : "No messages yet."}
+                        </p>
+                      )}
                       {thread.unread_count > 0 && (
                         <span className="ml-2 bg-primary text-on-primary text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">
                           {thread.unread_count}
@@ -131,8 +167,8 @@ export const OwnerMessages = () => {
         </div>
       </div>
 
-      {/* Chat Window */}
-      <div className="flex-grow flex flex-col justify-between bg-surface">
+      {/* Chat window */}
+      <div className="flex-grow flex flex-col bg-surface">
         {activeThread ? (
           <>
             <div className="px-6 py-3 border-b border-outline-variant bg-surface-container-lowest flex items-center justify-between">
@@ -142,9 +178,13 @@ export const OwnerMessages = () => {
                   <h3 className="font-label-md text-label-md text-on-surface font-bold">
                     {getRecipient(activeThread)?.name || "User"}
                   </h3>
-                  <span className="text-xs text-outline uppercase font-bold">
-                    {getRecipient(activeThread)?.role || ""}
-                  </span>
+                  {activeTypers.length > 0 ? (
+                    <span className="text-xs text-primary font-semibold italic">typing...</span>
+                  ) : (
+                    <span className="text-xs text-outline uppercase font-bold">
+                      {getRecipient(activeThread)?.role || ""}
+                    </span>
+                  )}
                 </div>
               </div>
               {activeThread.property && (
@@ -174,34 +214,56 @@ export const OwnerMessages = () => {
                   const isMe     = senderId === currentUser?.id;
                   return (
                     <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 shadow-sm border ${
+                      {!isMe && (
+                        <Avatar src={msg.sender_image} name={msg.sender_name} size="xs" className="shrink-0 mt-1 mr-2" />
+                      )}
+                      <div className={`max-w-[65%] rounded-2xl px-4 py-2.5 shadow-sm ${
                         isMe
-                          ? "bg-primary text-on-primary border-primary rounded-br-none"
-                          : "bg-surface-container-lowest text-on-surface border-outline-variant/60 rounded-bl-none"
+                          ? "bg-primary text-on-primary rounded-br-none"
+                          : "bg-surface-container-lowest text-on-surface border border-outline-variant/60 rounded-bl-none"
                       }`}>
                         <p className="text-body-md whitespace-pre-line leading-relaxed">{body}</p>
-                        <span className={`text-[9px] block text-right mt-1 font-semibold ${isMe ? "text-primary-fixed/80" : "text-outline"}`}>
-                          {new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
+                        <div className="flex items-center justify-end gap-1 mt-1">
+                          <span className={`text-[9px] font-semibold ${isMe ? "text-on-primary/70" : "text-outline"}`}>
+                            {time ? new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                          </span>
+                          {isMe && (
+                            <span className={`material-symbols-outlined text-[12px] ${msg.is_read ? "text-secondary" : "text-on-primary/50"}`}>
+                              {msg.is_read ? "done_all" : "done"}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
                 })
               )}
+
+              {activeTypers.length > 0 && (
+                <div className="flex justify-start">
+                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl rounded-bl-none px-4 py-3 flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-outline rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-outline rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-outline rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
 
             <form onSubmit={handleSend} className="p-4 border-t border-outline-variant bg-surface-container-lowest flex items-center gap-3">
               <input
+                ref={inputRef}
                 type="text"
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Type your message..."
+                onChange={handleInputChange}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) handleSend(e); }}
+                placeholder={isConnected ? "Type your message..." : "Reconnecting..."}
                 className="flex-grow bg-surface-container border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary outline-none"
               />
-              <Button type="submit" variant="primary" className="py-3 px-6">
-                <span>Send</span>
-                <span className="material-symbols-outlined text-[18px]">send</span>
+              <Button type="submit" variant="primary" disabled={!inputText.trim()} className="py-3 px-5 shrink-0">
+                <span className="material-symbols-outlined text-[22px]">send</span>
               </Button>
             </form>
           </>
@@ -210,7 +272,7 @@ export const OwnerMessages = () => {
             <span className="material-symbols-outlined text-[64px] text-outline mb-4">chat</span>
             <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">Select a Conversation</h3>
             <p className="text-body-md text-on-surface-variant max-w-sm mt-2">
-              Choose a message thread from the sidebar or click 'Chat' on an application to start talking.
+              Choose a message thread from the sidebar or click 'Chat' on an application.
             </p>
           </div>
         )}
