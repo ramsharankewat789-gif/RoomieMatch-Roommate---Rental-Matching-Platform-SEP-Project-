@@ -30,5 +30,20 @@ export default defineConfig({
     fs: {
       allow: [rootDir],
     },
+    proxy: {
+      // Proxy all API requests to the backend — eliminates any browser CORS/fetch issues
+      "/api": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+        secure: false,
+      },
+      // Proxy Socket.io WebSocket connections
+      "/socket.io": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
+    },
   },
 });

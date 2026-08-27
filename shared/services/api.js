@@ -2,11 +2,11 @@
  * api.js — Thin fetch wrapper for all RoomieMatch API calls.
  *
  * - Reads the JWT from localStorage (set by AuthContext on login).
- * - All requests go to the Express server at http://localhnpmost:4000.
+ * - All requests go to the Express server at http://localhost:4000.
  * - Never exposes secrets or tokens in URLs.
  */
 
-const BASE_URL = import.meta.env?.VITE_API_URL || "http://localhost:4000/api";
+const BASE_URL = import.meta.env?.VITE_API_URL || "/api";
 
 function getToken() {
   return localStorage.getItem("roomiematch_jwt") || null;
