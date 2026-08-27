@@ -27,17 +27,16 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: false,    // Allow fallback to next port if 5173 is busy
     fs: {
       allow: [rootDir],
     },
     proxy: {
-      // Proxy all API requests to the backend — eliminates any browser CORS/fetch issues
       "/api": {
         target: "http://localhost:4000",
         changeOrigin: true,
         secure: false,
       },
-      // Proxy Socket.io WebSocket connections
       "/socket.io": {
         target: "http://localhost:4000",
         changeOrigin: true,

@@ -39,21 +39,31 @@ const PORT = process.env.PORT || 4000;
 const httpServer = http.createServer(app);
 
 // ── Allowed origins ────────────────────────────────────────────────────────
+// In development, accept any localhost port (Vite auto-increments if port is busy).
+// In production, only the explicit CLIENT_URL and ADMIN_URL are allowed.
+const isDev = (process.env.NODE_ENV || "development") !== "production";
+
 const allowedOrigins = [
   process.env.CLIENT_URL || "http://localhost:5173",
   process.env.ADMIN_URL  || "http://localhost:5174"
 ];
 
+function isAllowedOrigin(origin) {
+  if (!origin) return true; // same-origin / server-to-server
+  if (allowedOrigins.includes(origin)) return true;
+  // In development: accept any http://localhost:* or http://127.0.0.1:*
+  if (isDev && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  return false;
+}
+
 // ── Socket.io setup ────────────────────────────────────────────────────────
 const io = new Server(httpServer, {
   cors: {
-    origin:      allowedOrigins,
+    origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
     methods:     ["GET", "POST"],
     credentials: true,
   },
-  // Allow both WebSocket and HTTP long-polling fallback
   transports: ["websocket", "polling"],
-  // Ping every 25s, timeout after 60s
   pingInterval: 25000,
   pingTimeout:  60000,
 });
@@ -72,7 +82,7 @@ app.use(helmet({
 // ── CORS ───────────────────────────────────────────────────────────────────
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    if (isAllowedOrigin(origin)) return cb(null, true);
     cb(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
