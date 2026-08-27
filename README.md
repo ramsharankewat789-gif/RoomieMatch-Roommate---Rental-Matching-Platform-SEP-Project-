@@ -583,23 +583,43 @@ cd server && npm start
 ## Troubleshooting
 
 **Server fails to start**
-- Ensure MySQL/MariaDB is running before starting `node src/index.js`
+- Ensure MySQL/MariaDB is running **before** starting `node src/index.js`
 - Check `server/.env` has correct `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
 - Run `npm run db:migrate` if tables are missing
 
+**"Failed to fetch" or CORS error on login**
+- Start the backend **first** (`cd server && npm run dev`) before opening the browser
+- Vite may start on a different port (5175, 5176, etc.) if 5173 is busy — this is fine, the server accepts any `localhost:*` port in development
+- If the error persists, check that port 4000 is free: `netstat -ano | findstr :4000`
+
 **Login not working**
-- Client app: use `alex@user.com` or `sarah@user.com` (not the admin account)
-- Admin panel: use `admin@roomiematch.com` (not a regular user account)
-- Ensure backend is running on port 4000 before attempting login
-- Check browser console for CORS or network errors
+- Client app: use `alex@user.com` / `password123` (not the admin account)
+- Admin panel: use `admin@roomiematch.com` / `password123` (not a regular user account)
+- Admin accounts are **blocked** on the client app; regular users are **blocked** on the admin panel
+
+**`npm install` fails**
+- Make sure Node.js 18+ is installed: `node --version`
+- Delete `node_modules` and retry:
+  ```powershell
+  # Windows
+  Remove-Item -Recurse -Force node_modules; npm install
+  cd server; Remove-Item -Recurse -Force node_modules; npm install; cd ..
+  ```
+
+**Database connection error**
+- Make sure XAMPP MySQL is started (green in control panel)
+- Run `npm run db:migrate` again from the `server` folder
+- Default XAMPP root password is blank — `DB_PASSWORD=` in `server/.env`
 
 **Google OAuth not working**
-- Add `http://localhost:5173` and `http://localhost:5174` as authorised JavaScript origins in Google Cloud Console
+- Google OAuth is **optional** — email/password login works without it
+- To enable: add `http://localhost:5173` and `http://localhost:5174` as authorised JavaScript origins in [Google Cloud Console](https://console.cloud.google.com)
 - Ensure `VITE_GOOGLE_CLIENT_ID` in root `.env` matches `GOOGLE_CLIENT_ID` in `server/.env`
 
-**OTP/email not arriving**
-- Enable 2-factor auth on Gmail and generate a 16-char App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-- Use the App Password as `SMTP_PASSWORD` in `server/.env`
+**Emails (OTP / forgot password) not sending**
+- SMTP is **optional** — the app works without it for demo purposes
+- To enable: generate a Gmail App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+- Use the 16-char App Password as `SMTP_PASSWORD` in `server/.env`
 
 **Port already in use (Windows)**
 ```powershell
@@ -607,10 +627,20 @@ netstat -ano | findstr :4000
 taskkill /PID <PID> /F
 ```
 
-**Rate limit hit during testing**
-- Auth endpoints: 20 requests per 15-minute window per IP
+**Rate limit hit**
+- Auth endpoints are limited to 20 requests per 15 minutes per IP
 - If blocked, wait 15 minutes or restart the server
 
+---
+
+## Running on Another Device
+
+Follow the exact same steps above. The only requirement is:
+1. Node.js 18+ installed
+2. XAMPP (or any MySQL 8 / MariaDB 10.4+ installation) running
+3. The repository cloned from GitHub
+
+Everything else (tables, demo data, dependencies) is set up by the commands in Steps 2–5 above.
 ---
 
 ## Project Info
