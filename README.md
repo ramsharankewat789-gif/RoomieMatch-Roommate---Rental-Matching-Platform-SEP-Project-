@@ -12,6 +12,7 @@ RoomieMatch is a full-stack web application that helps university students find 
 | Backend | Node.js 18+, Express 4 |
 | Database | MySQL 8 / MariaDB 10.4 (`mysql2/promise`) |
 | Authentication | JWT (HS256), Google OAuth 2.0, Email OTP |
+| Real-Time Chat | **Socket.io v4.8** (WebSocket + polling fallback) |
 | Maps | Leaflet + OpenStreetMap (no API key required) |
 | File Uploads | Multer (profile images, property photos, verification docs) |
 | Email | Nodemailer (SMTP / Gmail App Password) |
@@ -47,7 +48,7 @@ RoomieMatch/
 │                                   # VerificationManagement, ReportsManagement,
 │                                   # ReportsDetails, Analytics, AdminNotifications
 │
-├── server/                         # Express backend API (port 4000)
+├── server/                         # Express + Socket.io backend API (port 4000)
 │   ├── src/
 │   │   ├── controllers/            # authController, userController, propertyController,
 │   │   │                           # applicationController, uploadController,
@@ -56,6 +57,9 @@ RoomieMatch/
 │   │   │                           # reviewController, compatibilityController,
 │   │   │                           # passwordController
 │   │   ├── routes/                 # One route file per controller
+│   │   ├── socket/
+│   │   │   └── socketHandler.js    # Socket.io events: join_conversation, send_message,
+│   │   │                           # typing, disconnect — JWT auth middleware
 │   │   ├── middleware/
 │   │   │   ├── auth.js             # requireAuth, requireAdmin
 │   │   │   └── upload.js           # Multer (profiles, properties, verifications)
@@ -75,7 +79,7 @@ RoomieMatch/
 │   ├── context/
 │   │   ├── AuthContext.jsx         # JWT auth — real API login, register, rehydration
 │   │   ├── NotificationContext.jsx # Real-time polling (30s), mark read/delete
-│   │   └── SocketContext.jsx       # Messaging (15s conv poll, 8s message poll)
+│   │   └── SocketContext.jsx       # Socket.io client — real-time chat, typing indicators
 │   ├── hooks/
 │   │   ├── useAuth.js
 │   │   ├── useProperties.js        # Real API — CRUD, search, images
@@ -469,6 +473,43 @@ Scores are computed client-side by `useRoommates.js` and **persisted to MySQL** 
 
 ---
 
+## Real-Time Chat — Socket.io
+
+The messaging system uses **Socket.io v4.8** running on the same port 4000 as the REST API. Messages are delivered instantly with no polling delay.
+
+### How it works
+
+1. On login, the frontend connects to `ws://localhost:4000` with the JWT in `handshake.auth.token`
+2. Server validates the JWT — invalid tokens are rejected at the WebSocket handshake
+3. When a user opens a conversation, the client emits `join_conversation` to join the Socket.io room
+4. When a message is sent, the client emits `send_message` — the server saves it to MySQL then broadcasts `new_message` to the entire room
+5. Both sender and recipient receive the message instantly via the same room broadcast
+6. On logout, the socket disconnects automatically
+
+### Socket.io events
+
+| Direction | Event | Payload | Description |
+|---|---|---|---|
+| Client → Server | `join_conversation` | `{ conversationId }` | Join room, mark messages read |
+| Client → Server | `send_message` | `{ conversationId, body }` | Save to DB + broadcast |
+| Client → Server | `typing` | `{ conversationId, isTyping }` | Broadcast typing indicator |
+| Client → Server | `leave_conversation` | `{ conversationId }` | Leave room |
+| Server → Client | `new_message` | `{ message }` | New message in room |
+| Server → Client | `message_read` | `{ conversationId, readBy }` | Read receipt |
+| Server → Client | `user_typing` | `{ conversationId, userId, userName, isTyping }` | Typing indicator |
+| Server → Client | `connected` | `{ userId }` | Connection confirmed |
+| Server → Client | `error` | `{ message }` | Error feedback |
+
+### Chat UI features
+- **Instant delivery** — no polling, no refresh needed
+- **Live / Offline badge** — shows socket connection status in header
+- **Typing indicators** — animated dots when the other person is typing
+- **Read receipts** — single tick (sent), double blue tick (read by recipient)
+- **REST fallback** — if socket disconnects temporarily, falls back to REST POST
+- **Message history** — loaded via REST on conversation open for reliability
+
+---
+
 ## Maps
 
 Property listings include **latitude** and **longitude** coordinates. The `PropertyMap` component (`shared/components/common/PropertyMap.jsx`) renders an OpenStreetMap map using **Leaflet** — no API key required.
@@ -481,21 +522,22 @@ Property listings include **latitude** and **longitude** coordinates. The `Prope
 ## Features
 
 ### All Users (both apps)
+- **Public landing page** — hero, features, stats, how-it-works, compatibility showcase, CTA
 - Register with email/password or Google OAuth
+- Email address verification via secure link
 - Verify student identity by uploading ID document
 - Search and filter properties (city, price, type, bedrooms, amenities)
-- View properties on an interactive Leaflet map
+- View properties on an interactive Leaflet map with markers
 - Save favourite properties
 - Apply for a rental with a personal message
 - Track application status with full history timeline
 - List and manage own rental properties with photos
 - Accept or reject applications received for own listings
-- Message any other user directly
+- **Real-time messaging via Socket.io** — instant delivery, typing indicators, read receipts
 - Rate and review properties and roommates (1–5 stars)
-- Find compatible roommates using PRD-weighted scoring
-- Receive in-app notifications (messages, applications, verifications)
-- Email verification for account security
-- Forgot/reset password via email link
+- Find compatible roommates using PRD-weighted scoring (persisted to MySQL)
+- Receive in-app notifications (messages, applications, verifications — auto-created)
+- Forgot/reset password via secure email link
 
 ### Administrators
 - View platform statistics (users, properties, verifications, reports, revenue)
@@ -515,6 +557,7 @@ Property listings include **latitude** and **longitude** coordinates. The `Prope
 | JWT | HS256, validated against DB on every request (deleted users auto-rejected) |
 | Google tokens | Server-side `verifyIdToken` via `google-auth-library` |
 | OTP | `crypto.randomInt` (CSPRNG), bcrypt-hashed, 5min expiry, max 5 attempts |
+| Socket.io auth | JWT validated at WebSocket handshake — invalid tokens rejected before connection |
 | Rate limiting | Auth: 20/15min, OTP: 10/5min, Password: 5/15min, Messages: 60/min |
 | Verification docs | Auth-gated endpoint — never served as static files |
 | SQL injection | Parameterised queries throughout — zero string interpolation |
