@@ -9,7 +9,7 @@ export const Footer = () => {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined text-primary text-2xl icon-fill">home</span>
+              <img src="/images/logo.png" alt="RoomieMatch" className="h-8 w-auto" />
               <span className="font-headline-sm text-headline-sm font-bold text-primary">RoomieMatch</span>
             </div>
             <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed max-w-xs">
@@ -66,10 +66,6 @@ export const Footer = () => {
           <span className="font-label-sm text-label-sm text-outline">
             &copy; {new Date().getFullYear()} RoomieMatch. All rights reserved.
           </span>
-          <div className="flex items-center gap-2 text-xs text-outline font-semibold">
-            <span className="w-2 h-2 bg-secondary rounded-full" />
-            <span>Real-time messaging powered by Socket.io</span>
-          </div>
           <span className="font-label-sm text-label-sm text-outline">
             University of Wolverhampton — SEP Project
           </span>

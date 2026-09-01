@@ -87,40 +87,36 @@ export const LoginPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-8 relative overflow-hidden font-body-md text-on-surface w-full">
-      <div
-        className="absolute inset-0 z-0 bg-cover bg-center opacity-25"
-        style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuADeMePqBZADlSaGN2DpBmW6f6YM3nnDOHtFDHFZKlrAms-eK3OyHFRQB3Lrr_ep65YRntmyqsM3r4xVckoQy4oZtc5VtzZoVO-es-eNgvH8lcmr7SyMB0-Cvar29j5V3lun5cqvYKRqUdXlU-5ApoAggTU4j0W1aACxk7Jr-hUJEa1eyDkDDoaOAf1k5OHjnosDkhqDhnmVRcCzDEoUNYb4I_rbOELXypDYiSeZw6J6S7pDYd3weOT')" }}
-      />
-      <div className="absolute inset-0 z-0 bg-gradient-to-br from-surface/80 to-surface-container-low/90" />
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#667eea] via-[#764ba2] to-[#667eea]" />
 
-      <div className="bg-surface-container-lowest w-full max-w-md rounded-xl p-8 relative z-10 border border-outline-variant/40 shadow-[0px_4px_12px_rgba(0,0,0,0.05)] backdrop-blur-sm">
+      <div className="bg-white/95 backdrop-blur-sm w-full max-w-md rounded-2xl p-8 relative z-10 border border-white/20 shadow-[0px_8px_32px_rgba(102,126,234,0.2)]">
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-container/20 text-primary mb-4">
-            <span className="material-symbols-outlined text-3xl">admin_panel_settings</span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-gradient-to-br from-[#667eea] to-[#764ba2] mb-4 shadow-lg">
+            <img src="/images/logo.png" alt="RoomieMatch Admin" className="h-12 w-auto" />
           </div>
-          <h1 className="font-headline-lg text-headline-lg text-primary mb-1 tracking-tight">
+          <h1 className="font-headline-lg text-headline-lg bg-gradient-to-r from-[#667eea] to-[#764ba2] bg-clip-text text-transparent mb-1 tracking-tight">
             RoomieMatch Admin
           </h1>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-error mb-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-2">
             Administrator Access Only
           </p>
-          <p className="font-body-md text-body-md text-on-surface-variant">
+          <p className="font-body-md text-body-md text-gray-600">
             Sign in to the admin panel
           </p>
         </div>
 
         {/* Demo credentials */}
-        <div className="bg-surface-container-low border border-outline-variant p-3 rounded-lg text-xs mb-6 text-on-surface-variant leading-relaxed">
-          <p className="font-bold mb-1 text-primary">
-            Demo Admin (Password: <code className="bg-surface-container-high px-1 py-0.5 rounded">password123</code>):
+        <div className="bg-gradient-to-r from-[#667eea]/10 to-[#764ba2]/10 border border-[#667eea]/30 p-3 rounded-xl text-xs mb-6 text-gray-700 leading-relaxed">
+          <p className="font-bold mb-1 bg-gradient-to-r from-[#667eea] to-[#764ba2] bg-clip-text text-transparent">
+            Demo Admin (Password: <code className="bg-white/80 px-1 py-0.5 rounded">password123</code>):
           </p>
           <ul className="list-disc pl-4">
-            <li>Admin: <code className="bg-surface-container-high px-1 py-0.5 rounded">admin@roomiematch.com</code></li>
+            <li>Admin: <code className="bg-white/80 px-1 py-0.5 rounded">admin@roomiematch.com</code></li>
           </ul>
         </div>
 
         {error && (
-          <div className="bg-error-container/20 border border-error/40 text-error p-3 rounded-lg text-xs font-semibold mb-4 flex items-center gap-2">
+          <div className="bg-red-50 border border-red-300 text-red-700 p-3 rounded-xl text-xs font-semibold mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-sm">warning</span>
             <span>{error}</span>
           </div>
@@ -131,7 +127,7 @@ export const LoginPage = () => {
           <>
             <div className="mb-4">
               {googleLoading ? (
-                <div className="w-full flex items-center justify-center gap-2 py-3 border border-outline-variant rounded-lg text-on-surface-variant text-sm">
+                <div className="w-full flex items-center justify-center gap-2 py-3 border border-[#667eea]/30 rounded-xl text-gray-600 text-sm bg-white">
                   <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
                   Connecting to Google...
                 </div>
@@ -140,20 +136,20 @@ export const LoginPage = () => {
               )}
             </div>
             <div className="flex items-center gap-3 mb-5">
-              <div className="flex-1 h-px bg-outline-variant" />
-              <span className="text-xs text-outline font-semibold">or sign in with email</span>
-              <div className="flex-1 h-px bg-outline-variant" />
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#667eea]/30 to-transparent" />
+              <span className="text-xs text-gray-500 font-semibold">or sign in with email</span>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#667eea]/30 to-transparent" />
             </div>
           </>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <label className="block font-label-md text-label-md text-on-surface" htmlFor="email">
+            <label className="block font-label-md text-label-md text-gray-700" htmlFor="email">
               Admin Email
             </label>
             <div className="relative group">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#667eea] transition-colors">
                 mail
               </span>
               <input
@@ -163,17 +159,17 @@ export const LoginPage = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@roomiematch.com"
                 required
-                className="w-full pl-10 pr-4 py-3 border border-outline-variant rounded-lg bg-surface-container-lowest text-on-surface placeholder:text-outline-variant focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 outline-none"
+                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl bg-white text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:ring-[#667eea]/50 focus:border-[#667eea] transition-all duration-200 outline-none"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="block font-label-md text-label-md text-on-surface" htmlFor="password">
+            <label className="block font-label-md text-label-md text-gray-700" htmlFor="password">
               Password
             </label>
             <div className="relative group">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#667eea] transition-colors">
                 lock
               </span>
               <input
@@ -183,7 +179,7 @@ export const LoginPage = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full pl-10 pr-4 py-3 border border-outline-variant rounded-lg bg-surface-container-lowest text-on-surface placeholder:text-outline-variant focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 outline-none"
+                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl bg-white text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:ring-[#667eea]/50 focus:border-[#667eea] transition-all duration-200 outline-none"
               />
             </div>
           </div>
@@ -191,7 +187,7 @@ export const LoginPage = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary text-on-primary font-label-md text-label-md py-3.5 rounded-lg hover:bg-surface-tint active:scale-[0.98] transition-all duration-200 shadow-sm flex justify-center items-center gap-2 mt-2 disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-label-md text-label-md py-3.5 rounded-xl hover:shadow-lg hover:shadow-[#667eea]/50 active:scale-[0.98] transition-all duration-200 shadow-md flex justify-center items-center gap-2 mt-2 disabled:opacity-50"
           >
             {loading ? (
               <>
@@ -207,8 +203,8 @@ export const LoginPage = () => {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-outline-variant/30 text-center">
-          <p className="font-body-md text-body-md text-on-surface-variant text-xs">
+        <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+          <p className="font-body-md text-body-md text-gray-500 text-xs">
             User accounts sign in on the client app (port 5173).
           </p>
         </div>

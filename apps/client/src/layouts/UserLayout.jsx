@@ -4,29 +4,36 @@ import { AuthContext } from "@shared/context/AuthContext";
 import Navbar from "../components/layout/Navbar";
 import UserSidebar from "../components/layout/UserSidebar";
 
-/**
- * UserLayout — layout for the Client interface.
- * Accessible to any authenticated non-admin user (role === "user").
- * Redirects unauthenticated visitors to /login.
- * Redirects admins to their own isolated interface.
- */
 export const UserLayout = () => {
-  const { currentUser } = useContext(AuthContext);
+  const { currentUser, authLoading } = useContext(AuthContext);
 
-  if (!currentUser) {
-    return <Navigate to="/login" replace />;
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-surface">
+        <div className="flex flex-col items-center gap-3">
+          <span className="material-symbols-outlined text-primary text-5xl animate-spin">progress_activity</span>
+          <p className="text-on-surface-variant text-sm">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (currentUser.role === "admin") {
-    return <Navigate to="/login" replace />;
-  }
+  if (!currentUser) return <Navigate to="/login" replace />;
+  if (currentUser.role === "admin") return <Navigate to="/login" replace />;
 
   return (
-    <div className="flex flex-col min-h-screen w-full">
+    /*
+      Root: exactly 100vh, no overflow — bounds the layout to the viewport.
+      header: sticky top-0 (already set in Navbar via className)
+      row: flex:1 now has a real bounded height to measure against
+      sidebar: height:100% + overflowY:auto → independent scroll
+      main: flex:1 + overflowY:auto → independent scroll
+    */
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <Navbar />
-      <div className="flex flex-grow w-full">
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
         <UserSidebar />
-        <main className="flex-1 overflow-y-auto bg-surface p-6">
+        <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }} className="bg-surface p-6">
           <Outlet />
         </main>
       </div>

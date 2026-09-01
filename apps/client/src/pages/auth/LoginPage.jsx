@@ -105,8 +105,8 @@ export const LoginPage = () => {
       <div className="bg-surface-container-lowest w-full max-w-md rounded-xl p-8 relative z-10 border border-outline-variant/40 shadow-[0px_4px_12px_rgba(0,0,0,0.05)] backdrop-blur-sm">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-container/20 text-primary mb-4">
-            <span className="material-symbols-outlined text-3xl">home_work</span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-lg bg-primary-container/20 mb-4">
+            <img src="/images/logo.png" alt="RoomieMatch" className="h-12 w-auto" />
           </div>
           <h1 className="font-headline-lg text-headline-lg text-primary mb-2 tracking-tight">
             RoomieMatch

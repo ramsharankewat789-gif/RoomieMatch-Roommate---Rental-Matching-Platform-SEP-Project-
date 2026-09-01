@@ -12,18 +12,23 @@ import React, { useState, useEffect, useContext } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
 import { useMessages } from "@shared/hooks/useMessages";
+import { formatCurrency } from "@shared/utils/currency";
 import {
   apiGetProperty,
   apiSubmitApplication,
   apiAddFavourite,
   apiRemoveFavourite,
   apiGetFavouriteStatus,
+  apiListReviews,
+  apiSubmitReview,
+  apiSubmitReport,
 } from "@shared/services/api";
 import Avatar from "@shared/components/common/Avatar";
 import Button from "@shared/components/common/Button";
 import Modal from "@shared/components/common/Modal";
 import Textarea from "@shared/components/common/Textarea";
 import PropertyMap from "@shared/components/common/PropertyMap";
+import Rating from "@shared/components/common/Rating";
 
 export const PropertyDetails = () => {
   const { id }       = useParams();
@@ -42,6 +47,22 @@ export const PropertyDetails = () => {
   const [appMessage,   setAppMessage]   = useState("");
   const [appLoading,   setAppLoading]   = useState(false);
   const [appError,     setAppError]     = useState("");
+
+  // Reviews state
+  const [reviews,       setReviews]       = useState([]);
+  const [reviewsLoading,setReviewsLoading]= useState(false);
+  const [reviewOpen,    setReviewOpen]    = useState(false);
+  const [reviewRating,  setReviewRating]  = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError,   setReviewError]   = useState("");
+
+  // Report state
+  const [reportOpen,    setReportOpen]    = useState(false);
+  const [reportReason,  setReportReason]  = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError,   setReportError]   = useState("");
+  const [reportSuccess, setReportSuccess] = useState(false);
 
   // Load property
   useEffect(() => {
@@ -85,6 +106,57 @@ export const PropertyDetails = () => {
     if (!property?.owner_id) return;
     const threadId = await getOrCreateThread(property.owner_id, property.id);
     if (threadId) navigate(`/user/messages?thread=${threadId}`);
+  };
+
+  // Load reviews for this property
+  useEffect(() => {
+    if (!id) return;
+    setReviewsLoading(true);
+    apiListReviews({ targetProperty: id })
+      .then(data => setReviews(data.reviews || []))
+      .catch(() => {})
+      .finally(() => setReviewsLoading(false));
+  }, [id]);
+
+  // ── Submit review ────────────────────────────────────────────────────────
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!reviewComment.trim()) { setReviewError("Please write a comment."); return; }
+    setReviewLoading(true);
+    setReviewError("");
+    try {
+      await apiSubmitReview({ rating: reviewRating, comment: reviewComment, target_property: id });
+      const data = await apiListReviews({ targetProperty: id });
+      setReviews(data.reviews || []);
+      setReviewOpen(false);
+      setReviewComment("");
+      setReviewRating(5);
+    } catch (err) {
+      setReviewError(err.message || "Failed to submit review.");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  // ── Submit report ─────────────────────────────────────────────────────────
+  const handleReportSubmit = async (e) => {
+    e.preventDefault();
+    if (!reportReason.trim()) { setReportError("Please describe the issue."); return; }
+    setReportLoading(true);
+    setReportError("");
+    try {
+      await apiSubmitReport({
+        title: "Inappropriate Property Listing",
+        reason: reportReason,
+        reported_property_id: id,
+      });
+      setReportSuccess(true);
+      setReportReason("");
+    } catch (err) {
+      setReportError(err.message || "Failed to submit report.");
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   // ── Apply ───────────────────────────────────────────────────────────────
@@ -137,6 +209,9 @@ export const PropertyDetails = () => {
   const availFrom = property.available_from
     ? new Date(property.available_from).toLocaleDateString()
     : "Available Now";
+  const avgRating = reviews.length
+    ? (reviews.reduce((s, r) => s + parseFloat(r.rating), 0) / reviews.length).toFixed(1)
+    : null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
@@ -172,8 +247,8 @@ export const PropertyDetails = () => {
 
         <div className="flex flex-row md:flex-col items-end gap-3 justify-between w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
           <div className="text-right">
-            <p className="font-headline-lg text-headline-lg text-primary font-bold">${property.price}</p>
-            <p className="text-xs text-outline font-semibold">/month + ${property.deposit} deposit</p>
+            <p className="font-headline-lg text-headline-lg text-primary font-bold">{formatCurrency(property.price)}</p>
+            <p className="text-xs text-outline font-semibold">/month + {formatCurrency(property.deposit)} deposit</p>
           </div>
           <button
             onClick={handleFavouriteToggle}
@@ -185,6 +260,16 @@ export const PropertyDetails = () => {
             </span>
             <span>{isFavourited ? "Saved" : "Save"}</span>
           </button>
+          {currentUser && !isOwnProperty && (
+            <button
+              onClick={() => { setReportOpen(true); setReportError(""); setReportSuccess(false); }}
+              className="flex items-center gap-1 px-4 py-2 border border-outline-variant rounded-lg text-on-surface hover:text-error hover:bg-surface-container transition-colors shadow-sm select-none text-sm"
+              title="Report this listing"
+            >
+              <span className="material-symbols-outlined text-[18px]">flag</span>
+              <span>Report</span>
+            </button>
+          )}
         </div>
       </section>
 
@@ -273,6 +358,62 @@ export const PropertyDetails = () => {
               />
             </section>
           )}
+
+          {/* Reviews & Ratings */}
+          <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <h2 className="font-headline-sm text-headline-sm text-on-surface">Reviews & Ratings</h2>
+                {avgRating && (
+                  <div className="flex items-center gap-1.5">
+                    <Rating value={parseFloat(avgRating)} />
+                    <span className="font-bold text-label-md text-on-surface">
+                      {avgRating} ({reviews.length})
+                    </span>
+                  </div>
+                )}
+              </div>
+              {currentUser && !isOwnProperty && (
+                <button
+                  onClick={() => { setReviewOpen(true); setReviewError(""); }}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-[17px]">rate_review</span>
+                  Write Review
+                </button>
+              )}
+            </div>
+
+            {reviewsLoading ? (
+              <div className="flex items-center gap-2 text-on-surface-variant text-sm">
+                <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                Loading reviews...
+              </div>
+            ) : reviews.length === 0 ? (
+              <p className="text-body-md text-on-surface-variant">
+                No reviews yet. {currentUser && !isOwnProperty ? "Be the first to leave one!" : ""}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {reviews.map(rev => (
+                  <div key={rev.id} className="border-b border-outline-variant/60 pb-4 last:border-b-0 last:pb-0">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="font-label-md text-label-md text-on-surface font-bold">
+                          {rev.reviewer_name}
+                        </span>
+                      </div>
+                      <Rating value={parseFloat(rev.rating)} />
+                    </div>
+                    <p className="text-body-md text-on-surface-variant mt-2">{rev.comment}</p>
+                    <span className="text-[10px] text-outline block mt-1 text-right">
+                      {rev.created_at ? new Date(rev.created_at).toLocaleDateString() : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
         {/* Right: Owner card + details */}
@@ -364,6 +505,96 @@ export const PropertyDetails = () => {
         </div>
       </div>
 
+      {/* Review Modal */}
+      <Modal
+        isOpen={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        title="Write a Review"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setReviewOpen(false)} disabled={reviewLoading}>Cancel</Button>
+            <Button variant="primary" onClick={handleReviewSubmit} disabled={reviewLoading || !reviewComment.trim()}>
+              {reviewLoading ? "Posting..." : "Post Review"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {reviewError && (
+            <div className="bg-error-container/20 border border-error/40 text-error p-3 rounded-lg text-sm font-semibold flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">warning</span>
+              {reviewError}
+            </div>
+          )}
+          <div className="space-y-1">
+            <label className="block font-label-md text-label-md text-on-surface-variant">Star Rating</label>
+            <div className="flex items-center gap-2">
+              <Rating value={reviewRating} size="lg" onChange={setReviewRating} />
+              <span className="font-bold text-label-md text-on-surface">{reviewRating} Stars</span>
+            </div>
+          </div>
+          <Textarea
+            label="Your Review"
+            placeholder="Share your experience with this property..."
+            value={reviewComment}
+            onChange={e => setReviewComment(e.target.value)}
+            rows={4}
+            required
+          />
+        </div>
+      </Modal>
+
+      {/* Report Modal */}
+      <Modal
+        isOpen={reportOpen}
+        onClose={() => { setReportOpen(false); setReportSuccess(false); setReportReason(""); setReportError(""); }}
+        title="Report This Listing"
+        footer={
+          reportSuccess ? (
+            <Button variant="primary" onClick={() => { setReportOpen(false); setReportSuccess(false); }}>
+              Close
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setReportOpen(false)} disabled={reportLoading}>Cancel</Button>
+              <Button variant="primary" onClick={handleReportSubmit} disabled={reportLoading || !reportReason.trim()}>
+                {reportLoading ? "Submitting..." : "Submit Report"}
+              </Button>
+            </>
+          )
+        }
+      >
+        {reportSuccess ? (
+          <div className="text-center py-4 space-y-3">
+            <span className="material-symbols-outlined text-[48px] text-secondary icon-fill">check_circle</span>
+            <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">Report Submitted</h3>
+            <p className="text-body-md text-on-surface-variant">
+              Thank you. Our team will review this listing and take appropriate action.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {reportError && (
+              <div className="bg-error-container/20 border border-error/40 text-error p-3 rounded-lg text-sm font-semibold flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">warning</span>
+                {reportError}
+              </div>
+            )}
+            <p className="text-body-md text-on-surface-variant">
+              Reporting: <strong>{property.title}</strong>
+            </p>
+            <Textarea
+              label="Reason for Reporting"
+              placeholder="Describe the issue — e.g. fake listing, misleading photos, incorrect pricing..."
+              value={reportReason}
+              onChange={e => setReportReason(e.target.value)}
+              rows={4}
+              required
+            />
+          </div>
+        )}
+      </Modal>
+
       {/* Apply Modal */}
       <Modal
         isOpen={applyOpen}
@@ -389,7 +620,7 @@ export const PropertyDetails = () => {
           )}
           <p className="text-body-md text-on-surface-variant">
             Applying for <strong>{property.title}</strong> at{" "}
-            <strong>${property.price}/month</strong>.
+            <strong>{formatCurrency(property.price)}/month</strong>.
           </p>
           <Textarea
             label="Introduce Yourself"

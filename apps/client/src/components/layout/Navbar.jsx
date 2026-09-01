@@ -2,6 +2,7 @@ import React, { useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
 import { NotificationContext } from "@shared/context/NotificationContext";
+import ThemeToggle from "@shared/components/common/ThemeToggle";
 import Avatar from "@shared/components/common/Avatar";
 
 /**
@@ -22,7 +23,7 @@ export const Navbar = () => {
           to={currentUser ? "/user/dashboard" : "/"}
           className="flex items-center gap-2 select-none"
         >
-          <span className="material-symbols-outlined text-primary text-3xl icon-fill">home</span>
+          <img src="/images/logo.png" alt="RoomieMatch" className="h-10 w-auto" />
           <span className="font-headline-lg text-headline-lg font-bold text-primary tracking-tight">
             RoomieMatch
           </span>
@@ -56,8 +57,10 @@ export const Navbar = () => {
 
         {/* Right-side actions */}
         <div className="flex items-center gap-4">
+          {/* Theme Toggle */}
+          <ThemeToggle />
 
-          {currentUser ? (
+          {currentUser && (
             <div className="flex items-center gap-4">
               {/* Notifications */}
               <Link
@@ -86,21 +89,6 @@ export const Navbar = () => {
                   <span className="material-symbols-outlined">logout</span>
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-4">
-              <Link
-                to="/login"
-                className="text-primary font-label-md text-label-md hover:bg-surface-container-low px-4 py-2 rounded-lg transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                to="/register"
-                className="bg-primary text-on-primary font-label-md text-label-md px-5 py-2.5 rounded-lg hover:bg-surface-tint transition-all hover:scale-95 shadow-sm"
-              >
-                Sign Up
-              </Link>
             </div>
           )}
         </div>

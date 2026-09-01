@@ -17,6 +17,8 @@ export const RoommateSearch = () => {
   const [gender, setGender] = useState("");
   const [minScore, setMinScore] = useState("");
   const [major, setMajor] = useState("");
+  const [city, setCity] = useState("");
+  const [university, setUniversity] = useState("");
 
   // Enrich roommates with compatibility scores
   const roommates = candidates.map(c => {
@@ -55,6 +57,16 @@ export const RoommateSearch = () => {
       return false;
     }
 
+    // City
+    if (city && (!item.city || !item.city.toLowerCase().includes(city.toLowerCase()))) {
+      return false;
+    }
+
+    // University
+    if (university && (!item.university || !item.university.toLowerCase().includes(university.toLowerCase()))) {
+      return false;
+    }
+
     // Min compatibility
     if (minScore && item.compat.compatibilityScore < Number(minScore)) {
       return false;
@@ -87,29 +99,43 @@ export const RoommateSearch = () => {
       </div>
 
       {/* Filter Section */}
-      <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Input
-          placeholder="Search name, major, bio..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          icon="search"
-        />
-        <Input
-          placeholder="Filter by Major"
-          value={major}
-          onChange={(e) => setMajor(e.target.value)}
-          icon="school"
-        />
-        <Select
-          options={genderOptions}
-          value={gender}
-          onChange={(e) => setGender(e.target.value)}
-        />
-        <Select
-          options={scoreOptions}
-          value={minScore}
-          onChange={(e) => setMinScore(e.target.value)}
-        />
+      <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Input
+            placeholder="Search name, major, bio..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            icon="search"
+          />
+          <Input
+            placeholder="Filter by Major"
+            value={major}
+            onChange={(e) => setMajor(e.target.value)}
+            icon="school"
+          />
+          <Input
+            placeholder="Filter by City"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            icon="location_city"
+          />
+          <Input
+            placeholder="Filter by University"
+            value={university}
+            onChange={(e) => setUniversity(e.target.value)}
+            icon="account_balance"
+          />
+          <Select
+            options={genderOptions}
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+          />
+          <Select
+            options={scoreOptions}
+            value={minScore}
+            onChange={(e) => setMinScore(e.target.value)}
+          />
+        </div>
       </section>
 
       {/* Roommates Grid */}
@@ -124,6 +150,8 @@ export const RoommateSearch = () => {
             setGender("");
             setMinScore("");
             setMajor("");
+            setCity("");
+            setUniversity("");
           }}
         />
       ) : (

@@ -5,6 +5,7 @@ import { useProperties } from "@shared/hooks/useProperties";
 import { useRoommates } from "@shared/hooks/useRoommates";
 import { useApplications } from "@shared/hooks/useApplications";
 import { useMessages } from "@shared/hooks/useMessages";
+import { formatCurrency, formatPriceRange } from "@shared/utils/currency";
 import Avatar from "@shared/components/common/Avatar";
 import StatusBadge from "@shared/components/common/StatusBadge";
 
@@ -46,7 +47,9 @@ export const TenantDashboard = () => {
             Welcome back, {currentUser?.name}!
           </h1>
           <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-            State University Campus Network &bull; Active Student Profile
+            {currentUser?.university
+              ? `${currentUser.university} · Active Profile`
+              : "Welcome to RoomieMatch"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -152,7 +155,7 @@ export const TenantDashboard = () => {
                         {prop.title}
                       </h3>
                       <p className="text-xs text-on-surface-variant truncate mt-0.5">{prop.address}</p>
-                      <p className="font-headline-sm text-headline-sm text-primary mt-2 font-bold">${prop.price}<span className="text-xs text-on-surface-variant font-normal">/month</span></p>
+                      <p className="font-headline-sm text-headline-sm text-primary mt-2 font-bold">{formatCurrency(prop.price)}<span className="text-xs text-on-surface-variant font-normal">/month</span></p>
                     </div>
 
                     <Link

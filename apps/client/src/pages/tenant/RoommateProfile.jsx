@@ -11,10 +11,12 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
 import { useRoommates } from "@shared/hooks/useRoommates";
 import { useMessages } from "@shared/hooks/useMessages";
-import { apiGetUser, apiListReviews } from "@shared/services/api";
+import { apiGetUser, apiListReviews, apiSubmitReview, apiSubmitReport } from "@shared/services/api";
 import Avatar from "@shared/components/common/Avatar";
 import Rating from "@shared/components/common/Rating";
 import Button from "@shared/components/common/Button";
+import Modal from "@shared/components/common/Modal";
+import Textarea from "@shared/components/common/Textarea";
 
 export const RoommateProfile = () => {
   const { id }       = useParams();
@@ -28,6 +30,20 @@ export const RoommateProfile = () => {
   const [loading,     setLoading]     = useState(true);
   const [pageError,   setPageError]   = useState("");
   const [msgLoading,  setMsgLoading]  = useState(false);
+
+  // Leave a review state
+  const [reviewOpen,    setReviewOpen]    = useState(false);
+  const [reviewRating,  setReviewRating]  = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError,   setReviewError]   = useState("");
+
+  // Report state
+  const [reportOpen,    setReportOpen]    = useState(false);
+  const [reportReason,  setReportReason]  = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError,   setReportError]   = useState("");
+  const [reportSuccess, setReportSuccess] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -54,6 +70,47 @@ export const RoommateProfile = () => {
     const threadId = await getOrCreateThread(id);
     setMsgLoading(false);
     if (threadId) navigate(`/user/messages?thread=${threadId}`);
+  };
+
+  // ── Submit review ─────────────────────────────────────────────────────────
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!reviewComment.trim()) { setReviewError("Please write a comment."); return; }
+    setReviewLoading(true);
+    setReviewError("");
+    try {
+      await apiSubmitReview({ rating: reviewRating, comment: reviewComment, target_user: id });
+      const data = await apiListReviews({ targetUser: id });
+      setReviews(data.reviews || []);
+      setReviewOpen(false);
+      setReviewComment("");
+      setReviewRating(5);
+    } catch (err) {
+      setReviewError(err.message || "Failed to post review.");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  // ── Submit report ─────────────────────────────────────────────────────────
+  const handleReportSubmit = async (e) => {
+    e.preventDefault();
+    if (!reportReason.trim()) { setReportError("Please describe the issue."); return; }
+    setReportLoading(true);
+    setReportError("");
+    try {
+      await apiSubmitReport({
+        title: "Inappropriate User",
+        reason: reportReason,
+        reported_user_id: id,
+      });
+      setReportSuccess(true);
+      setReportReason("");
+    } catch (err) {
+      setReportError(err.message || "Failed to submit report.");
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   if (loading) {
@@ -92,6 +149,7 @@ export const RoommateProfile = () => {
     : user.budget_min ? `From $${user.budget_min}/mo` : "Not specified";
 
   return (
+    <>
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
 
       <Link
@@ -123,15 +181,25 @@ export const RoommateProfile = () => {
               </p>
             </div>
             {currentUser?.id !== user.id && (
-              <Button
-                variant="primary"
-                onClick={handleMessageUser}
-                disabled={msgLoading}
-                className="px-6 py-3"
-              >
-                <span className="material-symbols-outlined text-[20px]">chat</span>
-                {msgLoading ? "Opening..." : "Send Message"}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="primary"
+                  onClick={handleMessageUser}
+                  disabled={msgLoading}
+                  className="px-6 py-3"
+                >
+                  <span className="material-symbols-outlined text-[20px]">chat</span>
+                  {msgLoading ? "Opening..." : "Send Message"}
+                </Button>
+                <button
+                  onClick={() => { setReportOpen(true); setReportError(""); setReportSuccess(false); }}
+                  className="flex items-center gap-1 px-4 py-3 border border-outline-variant rounded-lg text-on-surface hover:text-error hover:bg-surface-container transition-colors text-sm font-semibold"
+                  title="Report this user"
+                >
+                  <span className="material-symbols-outlined text-[18px]">flag</span>
+                  Report
+                </button>
+              </div>
             )}
           </div>
 
@@ -184,12 +252,23 @@ export const RoommateProfile = () => {
           <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-headline-sm text-headline-sm text-on-surface">Roommate Feedback</h2>
-              {reviews.length > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <Rating value={avgRating} />
-                  <span className="font-bold text-label-md text-on-surface">({avgRating.toFixed(1)} / 5)</span>
-                </div>
-              )}
+              <div className="flex items-center gap-3">
+                {reviews.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Rating value={avgRating} />
+                    <span className="font-bold text-label-md text-on-surface">({avgRating.toFixed(1)} / 5)</span>
+                  </div>
+                )}
+                {currentUser && currentUser.id !== user.id && (
+                  <button
+                    onClick={() => { setReviewOpen(true); setReviewError(""); }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">rate_review</span>
+                    Write Review
+                  </button>
+                )}
+              </div>
             </div>
             <div className="space-y-4">
               {reviews.length === 0 ? (
@@ -271,6 +350,97 @@ export const RoommateProfile = () => {
         </div>
       </div>
     </div>
+
+    {/* Review Modal */}
+    <Modal
+      isOpen={reviewOpen}
+      onClose={() => setReviewOpen(false)}
+      title={`Review ${user?.name}`}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setReviewOpen(false)} disabled={reviewLoading}>Cancel</Button>
+            <Button variant="primary" onClick={handleReviewSubmit} disabled={reviewLoading || !reviewComment.trim()}>
+              {reviewLoading ? "Posting..." : "Post Review"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {reviewError && (
+            <div className="bg-error-container/20 border border-error/40 text-error p-3 rounded-lg text-sm font-semibold flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">warning</span>
+              {reviewError}
+            </div>
+          )}
+          <div className="space-y-1">
+            <label className="block font-label-md text-label-md text-on-surface-variant">Star Rating</label>
+            <div className="flex items-center gap-2">
+              <Rating value={reviewRating} size="lg" onChange={setReviewRating} />
+              <span className="font-bold text-label-md text-on-surface">{reviewRating} Stars</span>
+            </div>
+          </div>
+          <Textarea
+            label="Your Review"
+            placeholder="Share your experience living with or meeting this person..."
+            value={reviewComment}
+            onChange={e => setReviewComment(e.target.value)}
+            rows={4}
+            required
+          />
+        </div>
+      </Modal>
+
+      {/* Report Modal */}
+      <Modal
+        isOpen={reportOpen}
+        onClose={() => { setReportOpen(false); setReportSuccess(false); setReportReason(""); setReportError(""); }}
+        title="Report This User"
+        footer={
+          reportSuccess ? (
+            <Button variant="primary" onClick={() => { setReportOpen(false); setReportSuccess(false); }}>
+              Close
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setReportOpen(false)} disabled={reportLoading}>Cancel</Button>
+              <Button variant="primary" onClick={handleReportSubmit} disabled={reportLoading || !reportReason.trim()}>
+                {reportLoading ? "Submitting..." : "Submit Report"}
+              </Button>
+            </>
+          )
+        }
+      >
+        {reportSuccess ? (
+          <div className="text-center py-4 space-y-3">
+            <span className="material-symbols-outlined text-[48px] text-secondary icon-fill">check_circle</span>
+            <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">Report Submitted</h3>
+            <p className="text-body-md text-on-surface-variant">
+              Thank you. Our moderation team will review this profile.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {reportError && (
+              <div className="bg-error-container/20 border border-error/40 text-error p-3 rounded-lg text-sm font-semibold flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">warning</span>
+                {reportError}
+              </div>
+            )}
+            <p className="text-body-md text-on-surface-variant">
+              Reporting: <strong>{user?.name}</strong>
+            </p>
+            <Textarea
+              label="Reason for Reporting"
+              placeholder="Describe the issue — e.g. fake profile, harassment, misleading information..."
+              value={reportReason}
+              onChange={e => setReportReason(e.target.value)}
+              rows={4}
+              required
+            />
+          </div>
+        )}
+      </Modal>
+    </>
   );
 };
 

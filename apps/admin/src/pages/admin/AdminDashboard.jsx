@@ -11,6 +11,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { apiGetAdminStats, apiGetAdminActivity, apiListPendingVerifications } from "@shared/services/api";
 import StatusBadge from "@shared/components/common/StatusBadge";
+import LoadingSpinner from "@shared/components/common/LoadingSpinner";
 
 export const AdminDashboard = () => {
   const [stats, setStats]             = useState(null);
@@ -41,12 +42,7 @@ export const AdminDashboard = () => {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-on-surface-variant gap-3">
-        <span className="material-symbols-outlined text-[24px] animate-spin">progress_activity</span>
-        Loading dashboard...
-      </div>
-    );
+    return <LoadingSpinner message="Loading dashboard..." />;
   }
 
   if (error) {

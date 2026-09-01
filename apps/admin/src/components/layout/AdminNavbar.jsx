@@ -2,6 +2,7 @@ import React, { useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
 import { NotificationContext } from "@shared/context/NotificationContext";
+import ThemeToggle from "@shared/components/common/ThemeToggle";
 import Avatar from "@shared/components/common/Avatar";
 
 /**
@@ -19,9 +20,7 @@ export const AdminNavbar = () => {
 
         {/* Brand + mode badge */}
         <Link to="/admin/dashboard" className="flex items-center gap-3 select-none">
-          <span className="material-symbols-outlined text-primary text-3xl icon-fill">
-            admin_panel_settings
-          </span>
+          <img src="/images/logo.png" alt="RoomieMatch" className="h-10 w-auto" />
           <div className="flex flex-col leading-tight">
             <span className="font-headline-lg text-headline-lg font-bold text-primary tracking-tight">
               RoomieMatch
@@ -34,6 +33,8 @@ export const AdminNavbar = () => {
 
         {/* Right-side actions */}
         <div className="flex items-center gap-4">
+          {/* Theme Toggle */}
+          <ThemeToggle />
 
           {/* Notification bell — admin notifications only */}
           <Link

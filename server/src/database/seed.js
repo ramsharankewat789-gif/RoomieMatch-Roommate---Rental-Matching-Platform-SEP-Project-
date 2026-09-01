@@ -61,36 +61,36 @@ async function seed() {
     // id, name, email, password_hash, role, phone, university, major, age, gender, city, budget_min, budget_max, bio, is_verified, email_verified
     [
       ID.admin, "Alex Admin", "admin@roomiematch.com", pw,
-      "admin", "+1 (555) 015-8899",
-      null, null, null, null, "Metro City", null, null,
+      "admin", "+977 985-123-4567",
+      null, null, null, null, "Kathmandu", null, null,
       "Platform administrator.",
       1, 1
     ],
     [
       ID.alex, "Alex Mercer", "alex@user.com", pw,
-      "user", "+1 (555) 019-9234",
-      "State University", "Computer Science", 21, "Male", "Metro City", 800, 1200,
+      "user", "+977 981-234-5678",
+      "Tribhuvan University", "Computer Science", 21, "Male", "Kathmandu", 10000, 15000,
       "CS junior looking for a quiet study space and a friendly roommate. I enjoy hiking, coding side projects, and cooking.",
       1, 1
     ],
     [
       ID.sarah, "Sarah Jenkins", "sarah@user.com", pw,
-      "user", "+1 (555) 012-3456",
-      "City College", "Business Management", 28, "Female", "Metro City", 1000, 1500,
+      "user", "+977 984-567-8901",
+      "Kathmandu University", "Business Management", 28, "Female", "Kathmandu", 12000, 20000,
       "Experienced with property management and happy to help students find great housing near campus.",
       1, 1
     ],
     [
       ID.marcus, "Marcus Brody", "marcus@user.com", pw,
-      "user", "+1 (555) 014-4589",
-      "State University", "Business Administration", 22, "Male", "Metro City", 900, 1300,
+      "user", "+977 986-789-0123",
+      "Tribhuvan University", "Business Administration", 22, "Male", "Kathmandu", 11000, 17000,
       "Outgoing senior in business. Very active, loves soccer, and is looking for a roommate who doesn't mind occasional study groups.",
       1, 1
     ],
     [
       ID.chloe, "Chloe Henderson", "chloe@user.com", pw,
-      "user", "+1 (555) 017-7722",
-      "State University", "Graphic Design", 20, "Female", "Metro City", 700, 1050,
+      "user", "+977 983-456-7890",
+      "Tribhuvan University", "Graphic Design", 20, "Female", "Kathmandu", 9000, 14000,
       "Sophomore doing graphic design. I keep my space very clean and decorated. Love indoor plants, cafe hopping, and indie music.",
       0, 1
     ],
@@ -185,15 +185,15 @@ async function seed() {
       ID.prop1, ID.sarah,
       "University Gardens Apartment",
       "104 University Ave, Suite 3B",
-      "Metro City", "Apartment", 2, 2.0, 950.00, 950.00,
-      "Spacious 2-bedroom apartment just a short 5-minute walk to the main gates of State University. Fully furnished kitchen, central heating & air conditioning, high-speed fiber internet, and on-site laundry facilities. Quiet building perfect for studious tenants.",
+      "Kathmandu", "Apartment", 2, 2.0, 12500, 12500,
+      "Spacious 2-bedroom apartment just a short 5-minute walk to the main gates of Tribhuvan University. Fully furnished kitchen, central heating, high-speed fiber internet, and on-site laundry facilities. Quiet building perfect for studious tenants.",
       "2026-09-01", "active", 1
     ],
     [
       ID.prop2, ID.sarah,
       "Modern Townhouse with Backyard",
-      "452 Maple Street",
-      "Metro City", "Townhouse", 3, 2.5, 1250.00, 1250.00,
+      "452 Thamel Street",
+      "Kathmandu", "Townhouse", 3, 2.5, 16500, 16500,
       "Beautiful 3-bedroom, 2.5-bathroom townhouse with a modern open-concept kitchen, hardwood floors, and a lovely fenced backyard. Private parking included. Utilities (water/gas) are partially included in rent.",
       "2026-09-15", "active", 1
     ],
@@ -201,15 +201,15 @@ async function seed() {
       ID.prop3, ID.sarah,
       "Cozy Studio near Library",
       "88 College Road, Apt 1A",
-      "Metro City", "Studio", 1, 1.0, 750.00, 750.00,
+      "Kathmandu", "Studio", 1, 1.0, 9900, 9900,
       "Cozy studio apartment situated right next to the campus library and student union center. Features a kitchenette, modern bathroom, and pull-down Murphy bed. Ideal for single graduate students or busy juniors.",
-      "2026-10-01", "active", 0
+      "2026-10-01", "active", 1
     ],
     [
       ID.prop4, ID.sarah,
       "Sunny 4-Bed Student House",
-      "17 Oak Lane",
-      "Metro City", "House", 4, 2.0, 1800.00, 1800.00,
+      "17 Baneshwor Lane",
+      "Kathmandu", "House", 4, 2.0, 23750, 23750,
       "Bright 4-bedroom house perfect for a group of students. Large communal kitchen and lounge, two bathrooms, private garden, and street parking. A 10-minute bus ride to the university main campus.",
       "2026-09-01", "active", 1
     ],
@@ -318,11 +318,7 @@ async function seed() {
        (?, 'approved', 'Application approved by Sarah Jenkins',   DATE_SUB(NOW(), INTERVAL 8 DAY))`,
     [ID.app2, ID.app2]
   );
-  // Mark prop2 as rented since application was approved
-  await conn.execute(
-    "UPDATE properties SET status='rented' WHERE id=?",
-    [ID.prop2]
-  );
+  // Do NOT mark prop2 as rented — keep all properties active for demo
   console.log("  ✓ 2 applications + history");
 
   // ── 9. Sample notifications ───────────────────────────────────────────────
@@ -359,6 +355,71 @@ async function seed() {
     );
   }
   console.log(`  ✓ ${favs.length} favourite rows`);
+
+  // ── 11. Reviews ───────────────────────────────────────────────────────────
+  console.log("[Seed] Inserting reviews...");
+  const reviews = [
+    // id, reviewer_id, target_property, target_user, rating, comment
+    [uuidv4(), ID.alex,   ID.prop1, null, 4.5, "Great location, very close to campus. The apartment is clean and well maintained. Sarah is a wonderful landlord — responsive and helpful."],
+    [uuidv4(), ID.marcus, ID.prop2, null, 5.0, "The townhouse exceeded my expectations. Spacious, modern, and the backyard is a huge bonus. Highly recommend!"],
+    [uuidv4(), ID.chloe,  ID.prop1, null, 4.0, "Really nice apartment. Quiet building and great neighbours. A little pricey but worth it for the location."],
+    [uuidv4(), ID.alex,   ID.prop4, null, 4.5, "Perfect for student groups. Big kitchen, plenty of space, and easy bus access to university."],
+    [uuidv4(), ID.marcus, null, ID.sarah, 5.0, "Sarah is an amazing property owner. Very professional, quick to respond, and fair with pricing."],
+    [uuidv4(), ID.chloe,  null, ID.sarah, 4.5, "Had a great experience dealing with Sarah. Transparent and honest throughout the whole process."],
+  ];
+  for (const r of reviews) {
+    await conn.execute(
+      `INSERT IGNORE INTO reviews (id, reviewer_id, target_property, target_user, rating, comment)
+       VALUES (?,?,?,?,?,?)`,
+      r
+    );
+  }
+  console.log(`  ✓ ${reviews.length} review rows`);
+
+  // ── 12. Compatibility scores ──────────────────────────────────────────────
+  console.log("[Seed] Inserting compatibility scores...");
+  const scores = [
+    // user_id, candidate_id, score, budget_score, lifestyle_score, interests_score
+    [ID.alex,   ID.marcus, 78, 85, 70, 80],
+    [ID.alex,   ID.chloe,  65, 60, 75, 55],
+    [ID.alex,   ID.sarah,  55, 50, 65, 45],
+    [ID.marcus, ID.alex,   78, 85, 70, 80],
+    [ID.marcus, ID.chloe,  70, 65, 80, 60],
+    [ID.marcus, ID.sarah,  60, 55, 70, 50],
+    [ID.chloe,  ID.alex,   65, 60, 75, 55],
+    [ID.chloe,  ID.marcus, 70, 65, 80, 60],
+    [ID.chloe,  ID.sarah,  72, 70, 78, 65],
+  ];
+  for (const s of scores) {
+    await conn.execute(
+      `INSERT INTO compatibility_scores
+         (user_id, candidate_id, score, budget_score, lifestyle_score, interests_score)
+       VALUES (?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE
+         score=VALUES(score), budget_score=VALUES(budget_score),
+         lifestyle_score=VALUES(lifestyle_score), interests_score=VALUES(interests_score)`,
+      s
+    );
+  }
+  console.log(`  ✓ ${scores.length} compatibility score rows`);
+
+  // ── 13. Extra notifications ────────────────────────────────────────────────
+  console.log("[Seed] Inserting extra notifications...");
+  const extraNotifs = [
+    [uuidv4(), ID.marcus, "New Roommate Match",    "You have a 78% compatibility match with Alex Mercer!",           "general",      null],
+    [uuidv4(), ID.chloe,  "New Roommate Match",    "You have a 72% compatibility match with Sarah Jenkins!",         "general",      null],
+    [uuidv4(), ID.sarah,  "Property Verified",     "Your listing 'University Gardens Apartment' has been verified.", "verification", ID.prop1],
+    [uuidv4(), ID.alex,   "New Review Posted",     "Someone left a review on University Gardens Apartment.",         "general",      ID.prop1],
+    [uuidv4(), ID.marcus, "Application Approved",  "Your application for Modern Townhouse with Backyard was approved!", "application", ID.app2],
+  ];
+  for (const n of extraNotifs) {
+    await conn.execute(
+      `INSERT IGNORE INTO notifications (id, user_id, title, message, type, reference_id, is_read)
+       VALUES (?,?,?,?,?,?,0)`,
+      n
+    );
+  }
+  console.log(`  ✓ ${extraNotifs.length} extra notification rows`);
 
   await conn.end();
   console.log("\n[Seed] Complete — database is ready for demo use.\n");

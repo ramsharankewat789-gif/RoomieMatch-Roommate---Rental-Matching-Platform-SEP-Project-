@@ -9,8 +9,7 @@ import UserLayout from "../layouts/UserLayout";
 import LandingPage from "../pages/public/LandingPage";
 
 // Auth pages
-import LoginPage from "../pages/auth/LoginPage";
-import RegisterPage from "../pages/auth/RegisterPage";
+import { AuthPage } from "../pages/auth/AuthPage";
 import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import EmailVerificationPage from "../pages/auth/EmailVerificationPage";
@@ -52,8 +51,8 @@ export const UserRoutes = () => {
         {/* ── Public ───────────────────────────────────────────────── */}
         <Route element={<PublicLayout />}>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/register" element={<AuthPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<EmailVerificationPage />} />

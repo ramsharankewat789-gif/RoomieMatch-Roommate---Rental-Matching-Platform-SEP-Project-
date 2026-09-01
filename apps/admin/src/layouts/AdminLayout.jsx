@@ -4,28 +4,29 @@ import { AuthContext } from "@shared/context/AuthContext";
 import AdminNavbar from "../components/layout/AdminNavbar";
 import Sidebar from "../components/layout/Sidebar";
 
-/**
- * AdminLayout — layout wrapper for Admin mode.
- * Only accessible to users with role === "admin".
- * All other authenticated users are sent back to the User mode.
- */
 export const AdminLayout = () => {
-  const { currentUser } = useContext(AuthContext);
+  const { currentUser, authLoading } = useContext(AuthContext);
 
-  if (!currentUser) {
-    return <Navigate to="/login" replace />;
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-surface">
+        <div className="flex flex-col items-center gap-3">
+          <span className="material-symbols-outlined text-primary text-5xl animate-spin">progress_activity</span>
+          <p className="text-on-surface-variant text-sm">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (currentUser.role !== "admin") {
-    return <Navigate to="/login" replace />;
-  }
+  if (!currentUser) return <Navigate to="/login" replace />;
+  if (currentUser.role !== "admin") return <Navigate to="/login" replace />;
 
   return (
-    <div className="flex flex-col min-h-screen w-full">
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <AdminNavbar />
-      <div className="flex flex-grow w-full">
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
         <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-surface p-6">
+        <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }} className="bg-surface p-6">
           <Outlet />
         </main>
       </div>

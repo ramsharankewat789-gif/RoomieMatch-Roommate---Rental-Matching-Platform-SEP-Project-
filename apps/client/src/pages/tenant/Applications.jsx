@@ -11,6 +11,7 @@ import React, { useContext, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
 import { useApplications } from "@shared/hooks/useApplications";
+import { formatCurrency } from "@shared/utils/currency";
 import StatusBadge from "@shared/components/common/StatusBadge";
 import Button from "@shared/components/common/Button";
 import EmptyState from "@shared/components/common/EmptyState";
@@ -115,7 +116,7 @@ export const Applications = () => {
                 <div className="flex flex-col justify-between items-end gap-3 shrink-0">
                   <div className="text-right">
                     <span className="font-headline-sm text-headline-sm text-primary font-bold">
-                      ${propPrice}
+                      {formatCurrency(propPrice)}
                     </span>
                     <span className="text-xs text-outline font-medium">/month</span>
                   </div>

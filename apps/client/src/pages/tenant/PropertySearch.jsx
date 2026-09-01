@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useProperties } from "@shared/hooks/useProperties";
 import { AuthContext } from "@shared/context/AuthContext";
 import { apiAddFavourite, apiRemoveFavourite, apiGetFavouriteStatus } from "@shared/services/api";
+import { formatCurrency } from "@shared/utils/currency";
 import Input from "@shared/components/common/Input";
 import Select from "@shared/components/common/Select";
 import EmptyState from "@shared/components/common/EmptyState";
@@ -16,6 +17,7 @@ export const PropertySearch = () => {
   // Search & Filters state
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [maxPrice, setMaxPrice] = useState("");
+  const [city, setCity] = useState(searchParams.get("city") || "");
   const [type, setType] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [selectedAmenities, setSelectedAmenities] = useState([]);
@@ -68,6 +70,11 @@ export const PropertySearch = () => {
         p.city.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q);
       if (!matchText) return false;
+    }
+    
+    // City filter (exact match, case-insensitive)
+    if (city && !p.city.toLowerCase().includes(city.toLowerCase())) {
+      return false;
     }
     
     // Max price
@@ -137,12 +144,18 @@ export const PropertySearch = () => {
 
       {/* Filters Section */}
       <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Input
             placeholder="Search address, city, university..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             icon="search"
+          />
+          <Input
+            placeholder="Filter by City"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            icon="location_city"
           />
           <Input
             placeholder="Max Budget ($ / month)"
@@ -199,6 +212,7 @@ export const PropertySearch = () => {
           onActionClick={() => {
             setSearch("");
             setMaxPrice("");
+            setCity("");
             setType("");
             setBedrooms("");
             setSelectedAmenities([]);
@@ -289,7 +303,7 @@ export const PropertySearch = () => {
                     </div>
                     <div className="flex justify-between items-center border-t border-outline-variant/60 pt-3">
                       <span className="font-headline-sm text-headline-sm text-primary font-bold">
-                        ${prop.price}<span className="text-xs text-outline font-normal">/mo</span>
+                        {formatCurrency(prop.price)}<span className="text-xs text-outline font-normal">/mo</span>
                       </span>
                       <span className="text-xs text-primary font-bold flex items-center gap-0.5">
                         View Details

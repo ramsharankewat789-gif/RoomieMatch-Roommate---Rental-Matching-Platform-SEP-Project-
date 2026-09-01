@@ -1,0 +1,353 @@
+/**
+ * Dark Theme Styles
+ * Premium dark mode with purple accents
+ */
+
+.dark {
+  /* Dark mode color palette */
+  --dark-bg: #0f0f13;
+  --dark-surface: #1a1a1f;
+  --dark-surface-elevated: #24242a;
+  --dark-surface-hover: #2d2d35;
+  --dark-border: #2d2d35;
+  --dark-text: #e5e5e7;
+  --dark-text-secondary: #a0a0a8;
+  --dark-primary: #7c8aff;
+  --dark-primary-dark: #8b5cf6;
+}
+
+/* Body and background */
+.dark body {
+  background: linear-gradient(135deg, #0f0f13 0%, #1a1320 100%);
+  color: var(--dark-text);
+}
+
+/* Cards and surfaces */
+.dark .bg-surface-container-lowest,
+.dark .bg-surface-container-low,
+.dark .bg-surface-container,
+.dark .bg-surface,
+.dark .card {
+  background: var(--dark-surface) !important;
+  border-color: var(--dark-border) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .bg-surface-container-lowest:hover,
+.dark .bg-surface-container-low:hover,
+.dark .bg-surface-container:hover,
+.dark .bg-surface:hover,
+.dark .card:hover {
+  background: var(--dark-surface-elevated) !important;
+  box-shadow: 
+    0 20px 25px -5px rgba(124, 138, 255, 0.2),
+    0 10px 10px -5px rgba(124, 138, 255, 0.15) !important;
+}
+
+/* Shine effect for dark mode */
+.dark .bg-surface-container-lowest::before,
+.dark .bg-surface-container-low::before,
+.dark .bg-surface-container::before,
+.dark .bg-surface::before,
+.dark .card::before {
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0) 60%
+  );
+}
+
+/* Glow effect for dark mode */
+.dark .bg-surface-container-lowest::after,
+.dark .bg-surface-container-low::after,
+.dark .bg-surface-container::after,
+.dark .bg-surface::after,
+.dark .card::after {
+  background: radial-gradient(
+    circle at 50% 0%,
+    rgba(124, 138, 255, 0.4) 0%,
+    rgba(124, 138, 255, 0) 70%
+  );
+}
+
+/* Text colors */
+.dark .text-on-surface {
+  color: var(--dark-text) !important;
+}
+
+.dark .text-on-surface-variant {
+  color: var(--dark-text-secondary) !important;
+}
+
+/* Primary gradient for dark mode */
+.dark .bg-primary,
+.dark button.bg-primary {
+  background: linear-gradient(135deg, #7c8aff 0%, #8b5cf6 100%) !important;
+}
+
+.dark .text-primary {
+  background: linear-gradient(135deg, #7c8aff 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Inputs and forms */
+.dark input,
+.dark select,
+.dark textarea {
+  background: var(--dark-surface-elevated) !important;
+  border-color: var(--dark-border) !important;
+  color: var(--dark-text) !important;
+}
+
+.dark input::placeholder,
+.dark select::placeholder,
+.dark textarea::placeholder {
+  color: var(--dark-text-secondary) !important;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  background: var(--dark-surface-hover) !important;
+  border-color: var(--dark-primary) !important;
+  box-shadow: 0 0 0 3px rgba(124, 138, 255, 0.2) !important;
+}
+
+/* Borders */
+.dark .border-outline-variant,
+.dark .border-outline,
+.dark .border {
+  border-color: var(--dark-border) !important;
+}
+
+/* Navigation and sidebar */
+.dark .sidebar,
+.dark nav {
+  background: var(--dark-surface) !important;
+  border-color: var(--dark-border) !important;
+}
+
+.dark .nav-link:hover,
+.dark .sidebar-link:hover {
+  background: linear-gradient(135deg, rgba(124, 138, 255, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+}
+
+.dark .nav-link.active,
+.dark .sidebar-link.active {
+  background: linear-gradient(135deg, rgba(124, 138, 255, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%);
+  color: var(--dark-primary) !important;
+}
+
+/* Navbar */
+.dark .navbar {
+  background: var(--dark-surface) !important;
+  border-color: var(--dark-border) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Property and roommate cards */
+.dark .property-card,
+.dark .roommate-card {
+  background: var(--dark-surface) !important;
+  border-color: var(--dark-border) !important;
+}
+
+/* Status badges */
+.dark .badge-active,
+.dark .badge-verified {
+  background: linear-gradient(135deg, rgba(124, 138, 255, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+  color: var(--dark-primary);
+  border-color: rgba(124, 138, 255, 0.4);
+}
+
+.dark .badge-pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.dark .badge-inactive,
+.dark .badge-rejected {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Buttons */
+.dark .btn,
+.dark button {
+  color: var(--dark-text);
+}
+
+.dark .bg-secondary {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c8aff 100%) !important;
+}
+
+/* Links */
+.dark a {
+  color: var(--dark-primary);
+}
+
+.dark a:hover {
+  color: #9ca3ff;
+}
+
+/* Icons */
+.dark .material-symbols-outlined,
+.dark .icon {
+  color: var(--dark-primary);
+}
+
+/* Price tags */
+.dark .price-tag {
+  background: linear-gradient(135deg, #7c8aff 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Messages and alerts */
+.dark .success-message,
+.dark .bg-success-container {
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: #6ee7b7 !important;
+}
+
+.dark .error-message,
+.dark .bg-error-container {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #fca5a5 !important;
+}
+
+.dark .warning-message,
+.dark .bg-warning-container {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  color: #fbbf24 !important;
+}
+
+/* Tables */
+.dark table {
+  background: var(--dark-surface);
+  color: var(--dark-text);
+}
+
+.dark table thead {
+  background: linear-gradient(135deg, rgba(124, 138, 255, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+}
+
+.dark table tbody tr:hover {
+  background: linear-gradient(135deg, rgba(124, 138, 255, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
+}
+
+.dark table td,
+.dark table th {
+  border-color: var(--dark-border);
+}
+
+/* Modals and dropdowns */
+.dark .modal,
+.dark .dropdown {
+  background: var(--dark-surface-elevated) !important;
+  border-color: var(--dark-border) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Tabs */
+.dark .tab-active {
+  background: linear-gradient(135deg, #7c8aff 0%, #8b5cf6 100%);
+}
+
+.dark .tab-inactive {
+  background: var(--dark-surface-elevated);
+  color: var(--dark-text-secondary);
+  border-color: var(--dark-border);
+}
+
+.dark .tab-inactive:hover {
+  background: var(--dark-surface-hover);
+  color: var(--dark-text);
+}
+
+/* Filter chips */
+.dark .filter-chip {
+  background: var(--dark-surface-elevated);
+  border-color: var(--dark-border);
+  color: var(--dark-text-secondary);
+}
+
+.dark .filter-chip:hover {
+  background: var(--dark-surface-hover);
+  border-color: var(--dark-primary);
+  color: var(--dark-text);
+}
+
+.dark .filter-chip.active {
+  background: linear-gradient(135deg, #7c8aff 0%, #8b5cf6 100%);
+  color: white;
+}
+
+/* Search bar */
+.dark input[type="search"],
+.dark .search-input {
+  background: var(--dark-surface-elevated) !important;
+  border-color: var(--dark-border) !important;
+  color: var(--dark-text) !important;
+}
+
+/* Dividers */
+.dark hr,
+.dark .gradient-divider {
+  background: linear-gradient(90deg, transparent 0%, var(--dark-primary) 50%, transparent 100%);
+}
+
+/* Tooltips */
+.dark .tooltip {
+  background: linear-gradient(135deg, #7c8aff 0%, #8b5cf6 100%);
+  box-shadow: 0 4px 12px rgba(124, 138, 255, 0.4);
+}
+
+/* Loading skeleton */
+.dark .skeleton {
+  background: linear-gradient(90deg, #1a1a1f 25%, #24242a 50%, #1a1a1f 75%);
+  background-size: 200% 100%;
+}
+
+/* Scrollbar for dark mode */
+.dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--dark-surface);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--dark-surface-hover);
+  border-radius: 5px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--dark-primary);
+}
+
+/* Selection */
+.dark ::selection {
+  background: rgba(124, 138, 255, 0.3);
+  color: var(--dark-text);
+}
+
+/* Image filters for better contrast in dark mode */
+.dark img {
+  opacity: 0.9;
+}
+
+.dark img:hover {
+  opacity: 1;
+}

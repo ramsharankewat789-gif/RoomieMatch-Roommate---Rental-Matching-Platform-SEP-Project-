@@ -11,6 +11,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
 import { useMessages } from "@shared/hooks/useMessages";
 import { apiGetApplication, apiCancelApplication } from "@shared/services/api";
+import { formatCurrency } from "@shared/utils/currency";
 import StatusBadge from "@shared/components/common/StatusBadge";
 import Button from "@shared/components/common/Button";
 import Avatar from "@shared/components/common/Avatar";
@@ -145,7 +146,7 @@ export const ApplicationDetails = () => {
                 </p>
                 <div className="flex gap-4 mb-4">
                   <div className="bg-surface-container-low px-3 py-2 rounded-lg text-center">
-                    <span className="block font-headline-sm text-headline-sm text-primary">${propPrice}</span>
+                    <span className="block font-headline-sm text-headline-sm text-primary">{formatCurrency(propPrice)}</span>
                     <span className="block font-label-sm text-label-sm text-on-surface-variant">/ month</span>
                   </div>
                 </div>

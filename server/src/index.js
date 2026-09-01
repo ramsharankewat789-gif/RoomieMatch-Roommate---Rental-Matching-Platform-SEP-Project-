@@ -51,8 +51,8 @@ const allowedOrigins = [
 function isAllowedOrigin(origin) {
   if (!origin) return true; // same-origin / server-to-server
   if (allowedOrigins.includes(origin)) return true;
-  // In development: accept any http://localhost:* or http://127.0.0.1:*
-  if (isDev && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  // In development: accept any http://localhost:* or http://127.0.0.1:* or any local network IP
+  if (isDev && /^http:\/\/(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin)) return true;
   return false;
 }
 

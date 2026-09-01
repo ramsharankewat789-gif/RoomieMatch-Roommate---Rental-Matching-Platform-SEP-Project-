@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { apiListFavourites, apiRemoveFavourite } from "@shared/services/api";
+import { formatCurrency } from "@shared/utils/currency";
 import EmptyState from "@shared/components/common/EmptyState";
 
 export const Favorites = () => {
@@ -130,7 +131,7 @@ export const Favorites = () => {
                   <div className="pt-4 border-t border-outline-variant/60 flex justify-between items-center">
                     <div>
                       <span className="font-headline-md text-headline-md text-primary font-bold">
-                        ${prop.price}
+                        {formatCurrency(prop.price)}
                       </span>
                       <span className="text-xs text-outline font-medium">/month</span>
                     </div>

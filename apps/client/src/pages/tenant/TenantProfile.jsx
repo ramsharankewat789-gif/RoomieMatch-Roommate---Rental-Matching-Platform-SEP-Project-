@@ -2,15 +2,16 @@
  * TenantProfile.jsx
  *
  * Displays the current user's profile from AuthContext (real MySQL data).
- * Budget shown from budget_min / budget_max integers.
  * Profile image upload/remove calls real API.
- * Reviews section removed — no real reviews API yet.
+ * Reviews received shown from GET /api/reviews?targetUser=:id.
  */
-import React, { useContext, useRef, useState } from "react";
+import React, { useContext, useRef, useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { AuthContext } from "@shared/context/AuthContext";
+import { formatCurrency } from "@shared/utils/currency";
 import Avatar from "@shared/components/common/Avatar";
-import { apiUploadProfileImage, apiDeleteProfileImage } from "@shared/services/api";
+import Rating from "@shared/components/common/Rating";
+import { apiUploadProfileImage, apiDeleteProfileImage, apiListReviews } from "@shared/services/api";
 
 export const TenantProfile = () => {
   const { currentUser, updateProfile } = useContext(AuthContext);
@@ -18,13 +19,32 @@ export const TenantProfile = () => {
   const [imgLoading, setImgLoading] = useState(false);
   const [imgError,   setImgError]   = useState("");
 
+  // Reviews received by this user
+  const [reviews,        setReviews]        = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+
+  const loadReviews = useCallback(async () => {
+    if (!currentUser?.id) return;
+    setReviewsLoading(true);
+    try {
+      const data = await apiListReviews({ targetUser: currentUser.id });
+      setReviews(data.reviews || []);
+    } catch {
+      // silent — reviews are non-critical
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => { loadReviews(); }, [loadReviews]);
+
   if (!currentUser) return null;
 
   // Format budget from integers
   const budgetDisplay = currentUser.budget_min && currentUser.budget_max
-    ? `$${Number(currentUser.budget_min).toLocaleString()} – $${Number(currentUser.budget_max).toLocaleString()}/mo`
+    ? `${formatCurrency(currentUser.budget_min)} – ${formatCurrency(currentUser.budget_max)}/mo`
     : currentUser.budget_min
-      ? `From $${Number(currentUser.budget_min).toLocaleString()}/mo`
+      ? `From ${formatCurrency(currentUser.budget_min)}/mo`
       : "Not specified";
 
   // ── Profile image handlers ─────────────────────────────────────────────
@@ -225,6 +245,61 @@ export const TenantProfile = () => {
                   <span>{currentUser.phone}</span>
                 </div>
               )}
+            </div>
+          </section>
+
+          {/* Reviews received */}
+          <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-headline-sm text-headline-sm text-on-surface">Reviews Received</h2>
+              {reviews.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Rating
+                    value={parseFloat(
+                      (reviews.reduce((s, r) => s + parseFloat(r.rating), 0) / reviews.length).toFixed(1)
+                    )}
+                  />
+                  <span className="font-bold text-label-md text-on-surface text-sm">
+                    ({(reviews.reduce((s, r) => s + parseFloat(r.rating), 0) / reviews.length).toFixed(1)} / 5)
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {reviewsLoading ? (
+              <div className="flex items-center gap-2 text-on-surface-variant text-sm">
+                <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                Loading reviews...
+              </div>
+            ) : reviews.length === 0 ? (
+              <p className="text-body-md text-on-surface-variant">No reviews received yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {reviews.map(rev => (
+                  <div key={rev.id} className="border-b border-outline-variant/60 pb-4 last:border-b-0 last:pb-0">
+                    <div className="flex justify-between items-center">
+                      <span className="font-label-md text-label-md text-on-surface font-bold">
+                        {rev.reviewer_name}
+                      </span>
+                      <Rating value={parseFloat(rev.rating)} />
+                    </div>
+                    <p className="text-body-md text-on-surface-variant mt-2 italic">"{rev.comment}"</p>
+                    <span className="text-[10px] text-outline block mt-1 text-right">
+                      {rev.created_at ? new Date(rev.created_at).toLocaleDateString() : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 pt-3 border-t border-outline-variant/60">
+              <Link
+                to="/user/reviews"
+                className="text-sm text-primary font-semibold hover:underline flex items-center gap-1"
+              >
+                Write a review
+                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </Link>
             </div>
           </section>
         </div>
