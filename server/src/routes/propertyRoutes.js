@@ -15,9 +15,9 @@
  *   DELETE /api/properties/images/:imageId
  *   PATCH  /api/properties/images/:imageId/primary
  */
-const express   = require("express");
+const express = require("express");
 const rateLimit = require("express-rate-limit");
-const router    = express.Router();
+const router = express.Router();
 
 const { requireAuth, requireAdmin } = require("../middleware/auth");
 const {
@@ -27,12 +27,14 @@ const {
   updateProperty,
   deleteProperty,
   verifyProperty,
-  updatePropertyStatus
+  unverifyProperty,
+  updatePropertyStatus,
 } = require("../controllers/propertyController");
 
 const writeLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 30,
-  message: { error: "Too many property requests. Please try again later." }
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: "Too many property requests. Please try again later." },
 });
 
 // Optional auth middleware — attaches req.user if JWT present, but doesn't block unauthenticated requests
@@ -44,12 +46,13 @@ function optionalAuth(req, res, next) {
   return _requireAuth(req, res, next);
 }
 
-router.get("/",          optionalAuth,                   listProperties);
-router.post("/",         requireAuth,  writeLimiter,     createProperty);
-router.get("/:id",       optionalAuth,                   getProperty);
-router.put("/:id",       requireAuth,  writeLimiter,     updateProperty);
-router.delete("/:id",    requireAuth,                    deleteProperty);
-router.patch("/:id/verify", requireAuth, requireAdmin,   verifyProperty);
-router.patch("/:id/status", requireAuth,                 updatePropertyStatus);
+router.get("/", optionalAuth, listProperties);
+router.post("/", requireAuth, writeLimiter, createProperty);
+router.get("/:id", optionalAuth, getProperty);
+router.put("/:id", requireAuth, writeLimiter, updateProperty);
+router.delete("/:id", requireAuth, deleteProperty);
+router.patch("/:id/verify", requireAuth, requireAdmin, verifyProperty);
+router.patch("/:id/unverify", requireAuth, requireAdmin, unverifyProperty);
+router.patch("/:id/status", requireAuth, updatePropertyStatus);
 
 module.exports = router;

@@ -1,19 +1,19 @@
 /**
  * UserDetails.jsx (Admin)
  *
- * Loads user profile from GET /api/users/:id (real API).
- * Approve verification via POST /api/verification/:userId/approve.
- * Reject verification via POST /api/verification/:userId/reject.
- * Delete user via DELETE /api/users/:id.
- * No AuthContext.users dependency. No mock data.
+ * - View user profile and verification document
+ * - Verify / Unverify toggle switch (instant, no modal)
+ * - Edit user info inline via Edit modal
+ * - Block / Unblock / Delete
  */
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   apiGetUser,
   apiApproveVerification,
-  apiRejectVerification,
   apiUnverifyUser,
+  apiRejectVerification,
+  apiUpdateUser,
   apiDeleteUser,
   apiBlockUser,
   apiUnblockUser,
@@ -24,6 +24,8 @@ import Button from "@shared/components/common/Button";
 import StatusBadge from "@shared/components/common/StatusBadge";
 import Modal from "@shared/components/common/Modal";
 import Textarea from "@shared/components/common/Textarea";
+import Input from "@shared/components/common/Input";
+import Select from "@shared/components/common/Select";
 
 export const UserDetails = () => {
   const { id } = useParams();
@@ -33,11 +35,17 @@ export const UserDetails = () => {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [docModalOpen, setDocModalOpen] = useState(false);
+
+  // Reject modal (for PENDING docs)
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const [unverifyModal, setUnverifyModal] = useState(false);
-  const [unverifyReason, setUnverifyReason] = useState("");
-  const [docModalOpen, setDocModalOpen] = useState(false);
+
+  // Edit user modal
+  const [editModal, setEditModal] = useState(false);
+  const [editFields, setEditFields] = useState({});
+  const [editError, setEditError] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     apiGetUser(id)
@@ -46,18 +54,29 @@ export const UserDetails = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleApprove = async () => {
+  // ── Verify toggle ─────────────────────────────────────────────────────────
+  const handleVerifyToggle = async () => {
+    if (actionLoading) return;
+    const isNowVerified = user.is_verified === 1 || user.is_verified === true;
     setActionLoading(true);
     try {
-      await apiApproveVerification(id);
-      setUser((prev) => ({ ...prev, is_verified: 1 }));
+      if (isNowVerified) {
+        // Turn OFF — unverify immediately, no modal
+        await apiUnverifyUser(id, "Verification toggled off by administrator.");
+        setUser((prev) => ({ ...prev, is_verified: 0 }));
+      } else {
+        // Turn ON — approve immediately
+        await apiApproveVerification(id);
+        setUser((prev) => ({ ...prev, is_verified: 1 }));
+      }
     } catch (err) {
-      alert(err.message || "Failed to approve verification.");
+      alert(err.message || "Failed to update verification.");
     } finally {
       setActionLoading(false);
     }
   };
 
+  // ── Reject docs ───────────────────────────────────────────────────────────
   const handleReject = async () => {
     setActionLoading(true);
     try {
@@ -68,32 +87,92 @@ export const UserDetails = () => {
       setRejectModal(false);
       setUser((prev) => ({ ...prev, is_verified: 0 }));
     } catch (err) {
-      alert(err.message || "Failed to reject verification.");
+      alert(err.message || "Failed to reject.");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleUnverify = async () => {
-    setActionLoading(true);
+  // ── Open edit modal ───────────────────────────────────────────────────────
+  const openEdit = () => {
+    setEditFields({
+      name: user.name || "",
+      phone: user.phone || "",
+      university: user.university || "",
+      major: user.major || "",
+      city: user.city || "",
+      age: user.age || "",
+      gender: user.gender || "",
+      bio: user.bio || "",
+    });
+    setEditError("");
+    setEditModal(true);
+  };
+
+  // ── Save edits ────────────────────────────────────────────────────────────
+  const handleEditSave = async () => {
+    if (!editFields.name?.trim()) {
+      setEditError("Name is required.");
+      return;
+    }
+    if (editFields.phone?.trim()) {
+      const digits = editFields.phone
+        .trim()
+        .replace(/\D/g, "")
+        .replace(/^(977|0)/, "");
+      if (!/^\+?[\d\s\-().]{7,20}$/.test(editFields.phone.trim())) {
+        setEditError("Phone contains invalid characters.");
+        return;
+      }
+      if (digits.length !== 10) {
+        setEditError("Local phone number must be exactly 10 digits.");
+        return;
+      }
+    }
+    setEditLoading(true);
+    setEditError("");
     try {
-      await apiUnverifyUser(
-        id,
-        unverifyReason.trim() || "Verification revoked by administrator.",
-      );
-      setUnverifyModal(false);
-      setUser((prev) => ({ ...prev, is_verified: 0 }));
+      const data = await apiUpdateUser(id, {
+        name: editFields.name.trim(),
+        phone: editFields.phone.trim() || null,
+        university: editFields.university.trim() || null,
+        major: editFields.major.trim() || null,
+        city: editFields.city.trim() || null,
+        age: editFields.age ? Number(editFields.age) : null,
+        gender: editFields.gender || null,
+        bio: editFields.bio.trim() || null,
+      });
+      setUser(data.user);
+      setEditModal(false);
     } catch (err) {
-      alert(err.message || "Failed to unverify user.");
+      setEditError(err.message || "Failed to save changes.");
     } finally {
-      setActionLoading(false);
+      setEditLoading(false);
     }
   };
 
+  // ── Block / Unblock / Delete ──────────────────────────────────────────────
+  const handleBlock = async () => {
+    if (!window.confirm(`Block ${user?.name}?`)) return;
+    try {
+      await apiBlockUser(id);
+      setUser((prev) => ({ ...prev, is_blocked: 1 }));
+    } catch (err) {
+      alert(err.message || "Failed to block.");
+    }
+  };
+  const handleUnblock = async () => {
+    try {
+      await apiUnblockUser(id);
+      setUser((prev) => ({ ...prev, is_blocked: 0 }));
+    } catch (err) {
+      alert(err.message || "Failed to unblock.");
+    }
+  };
   const handleDelete = async () => {
     if (
       !window.confirm(
-        `Permanently delete ${user?.name}? This removes all their data.`,
+        `Permanently delete ${user?.name}? All data will be removed.`,
       )
     )
       return;
@@ -101,32 +180,11 @@ export const UserDetails = () => {
       await apiDeleteUser(id);
       navigate("/admin/users");
     } catch (err) {
-      alert(err.message || "Failed to delete user.");
+      alert(err.message || "Failed to delete.");
     }
   };
 
-  const handleBlock = async () => {
-    if (
-      !window.confirm(`Block ${user?.name}? They will not be able to log in.`)
-    )
-      return;
-    try {
-      await apiBlockUser(id);
-      setUser((prev) => ({ ...prev, is_blocked: 1 }));
-    } catch (err) {
-      alert(err.message || "Failed to block user.");
-    }
-  };
-
-  const handleUnblock = async () => {
-    try {
-      await apiUnblockUser(id);
-      setUser((prev) => ({ ...prev, is_blocked: 0 }));
-    } catch (err) {
-      alert(err.message || "Failed to unblock user.");
-    }
-  };
-
+  // ─────────────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48 text-on-surface-variant gap-2">
@@ -162,7 +220,7 @@ export const UserDetails = () => {
   const verifDoc = user.verificationDoc || {};
   const budgetDisplay =
     user.budget_min && user.budget_max
-      ? `Rs. ${user.budget_min.toLocaleString()} – Rs. ${user.budget_max.toLocaleString()}/mo`
+      ? `Rs. ${Number(user.budget_min).toLocaleString()} – Rs. ${Number(user.budget_max).toLocaleString()}/mo`
       : "Not specified";
 
   return (
@@ -177,7 +235,7 @@ export const UserDetails = () => {
         Back to User Registry
       </Link>
 
-      {/* ── Profile Header ────────────────────────────────────────────── */}
+      {/* ── Profile Header ─────────────────────────────────────────────── */}
       <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row items-center md:items-start gap-6">
         <Avatar
           src={user.profile_image || user.avatar}
@@ -209,40 +267,18 @@ export const UserDetails = () => {
               <p className="text-xs text-outline mt-1">ID: {user.id}</p>
             </div>
 
+            {/* Action buttons */}
             <div className="flex items-center gap-2 flex-wrap justify-center">
-              {!verified && verifDoc.status !== "NOT_SUBMITTED" && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => setRejectModal(true)}
-                    disabled={actionLoading}
-                    className="px-4 py-2 text-sm"
-                  >
-                    Reject Docs
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handleApprove}
-                    disabled={actionLoading}
-                    className="px-4 py-2 text-sm"
-                  >
-                    {actionLoading ? "Processing..." : "Verify User"}
-                  </Button>
-                </>
-              )}
-              {verified && (
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    setUnverifyReason("");
-                    setUnverifyModal(true);
-                  }}
-                  disabled={actionLoading}
-                  className="px-4 py-2 text-sm"
-                >
-                  Revoke Verification
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                onClick={openEdit}
+                className="px-4 py-2 text-sm"
+              >
+                <span className="material-symbols-outlined text-[16px] mr-1">
+                  edit
+                </span>
+                Edit User
+              </Button>
               {user.role !== "admin" && (
                 <>
                   {user.is_blocked ? (
@@ -254,7 +290,7 @@ export const UserDetails = () => {
                       <span className="material-symbols-outlined text-[16px] mr-1">
                         lock_open
                       </span>
-                      Unblock User
+                      Unblock
                     </Button>
                   ) : (
                     <Button
@@ -265,7 +301,7 @@ export const UserDetails = () => {
                       <span className="material-symbols-outlined text-[16px] mr-1">
                         block
                       </span>
-                      Block User
+                      Block
                     </Button>
                   )}
                   <Button
@@ -273,7 +309,7 @@ export const UserDetails = () => {
                     onClick={handleDelete}
                     className="px-4 py-2 text-sm"
                   >
-                    Delete User
+                    Delete
                   </Button>
                 </>
               )}
@@ -318,7 +354,7 @@ export const UserDetails = () => {
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* ── Profile Details ────────────────────────────────────────── */}
+        {/* ── Profile Details ─────────────────────────────────────────── */}
         <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
           <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold border-b border-outline-variant/60 pb-3">
             Profile Details
@@ -329,12 +365,10 @@ export const UserDetails = () => {
               { label: "Gender", value: user.gender || "—" },
               { label: "Budget", value: budgetDisplay },
               {
-                label: "Verified",
-                value: verified ? "Identity Verified" : "Not Verified",
-              },
-              {
                 label: "Email Status",
-                value: user.email_verified ? "Confirmed" : "Not Confirmed",
+                value: user.email_verified
+                  ? "✅ Confirmed"
+                  : "❌ Not Confirmed",
               },
               {
                 label: "Account Status",
@@ -352,8 +386,6 @@ export const UserDetails = () => {
               </div>
             ))}
           </div>
-
-          {/* Bio */}
           {user.bio && (
             <div className="mt-3 pt-3 border-t border-outline-variant/40">
               <p className="text-xs text-outline font-semibold uppercase tracking-wider mb-1">
@@ -364,8 +396,6 @@ export const UserDetails = () => {
               </p>
             </div>
           )}
-
-          {/* Hobbies */}
           {user.hobbies?.length > 0 && (
             <div className="mt-3 pt-3 border-t border-outline-variant/40">
               <p className="text-xs text-outline font-semibold uppercase tracking-wider mb-2">
@@ -385,23 +415,33 @@ export const UserDetails = () => {
           )}
         </section>
 
-        {/* ── Verification Document ──────────────────────────────────── */}
+        {/* ── Verification Document ───────────────────────────────────── */}
         <section className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
           <div className="flex justify-between items-center pb-3 border-b border-outline-variant/60">
             <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
-              Verification Document
+              Verification
             </h2>
-            <StatusBadge
-              status={
-                verified
-                  ? "verified"
-                  : verifDoc.status === "PENDING"
-                    ? "pending"
-                    : verifDoc.status === "REJECTED"
-                      ? "rejected"
-                      : "unverified"
-              }
-            />
+
+            {/* ── VERIFY / UNVERIFY TOGGLE SWITCH ── */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-on-surface-variant font-semibold">
+                {verified ? "Verified" : "Unverified"}
+              </span>
+              <button
+                onClick={handleVerifyToggle}
+                disabled={actionLoading}
+                title={verified ? "Click to unverify" : "Click to verify"}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                  verified ? "bg-secondary" : "bg-outline-variant"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                    verified ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
           </div>
 
           {verifDoc.status && verifDoc.status !== "NOT_SUBMITTED" ? (
@@ -417,6 +457,22 @@ export const UserDetails = () => {
                 </div>
                 <div>
                   <p className="text-xs text-outline font-semibold uppercase">
+                    Status
+                  </p>
+                  <div className="mt-1">
+                    <StatusBadge
+                      status={
+                        verified
+                          ? "verified"
+                          : verifDoc.status === "PENDING"
+                            ? "pending"
+                            : "rejected"
+                      }
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-outline font-semibold uppercase">
                     Submitted
                   </p>
                   <p className="text-on-surface font-bold mt-1">
@@ -427,6 +483,7 @@ export const UserDetails = () => {
                 </div>
               </div>
 
+              {/* View document button */}
               <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant text-center">
                 <span className="material-symbols-outlined text-[32px] text-primary mb-2 block">
                   description
@@ -459,25 +516,18 @@ export const UserDetails = () => {
                 </div>
               )}
 
-              {!verified && verifDoc.status !== "REJECTED" && (
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setRejectModal(true)}
-                    disabled={actionLoading}
-                    className="flex-1 text-sm"
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handleApprove}
-                    disabled={actionLoading}
-                    className="flex-1 text-sm"
-                  >
-                    {actionLoading ? "Processing..." : "Approve"}
-                  </Button>
-                </div>
+              {/* Reject button only for PENDING */}
+              {verifDoc.status === "PENDING" && !verified && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setRejectReason("");
+                    setRejectModal(true);
+                  }}
+                  className="w-full text-sm"
+                >
+                  Reject Document
+                </Button>
               )}
             </div>
           ) : (
@@ -488,16 +538,19 @@ export const UserDetails = () => {
               <p className="text-body-md text-on-surface-variant">
                 No document submitted yet.
               </p>
+              <p className="text-xs text-outline mt-1">
+                Use the toggle above to manually verify if needed.
+              </p>
             </div>
           )}
         </section>
       </div>
 
-      {/* Rejection Reason Modal */}
+      {/* ── Reject Modal ──────────────────────────────────────────────── */}
       <Modal
         isOpen={rejectModal}
         onClose={() => setRejectModal(false)}
-        title="Reject Verification"
+        title="Reject Document"
         footer={
           <>
             <Button variant="outline" onClick={() => setRejectModal(false)}>
@@ -515,54 +568,19 @@ export const UserDetails = () => {
       >
         <div className="space-y-4">
           <p className="text-body-md text-on-surface-variant">
-            Rejecting verification for <strong>{user.name}</strong>.
+            Rejecting document for <strong>{user.name}</strong>.
           </p>
           <Textarea
             label="Rejection Reason"
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="e.g. Document is blurry. Please resubmit a clear photo of your ID."
+            placeholder="e.g. Document is blurry. Please resubmit a clear photo."
             rows={3}
           />
         </div>
       </Modal>
 
-      {/* Unverify Modal */}
-      <Modal
-        isOpen={unverifyModal}
-        onClose={() => setUnverifyModal(false)}
-        title="Revoke Verification"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setUnverifyModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              onClick={handleUnverify}
-              disabled={actionLoading}
-            >
-              {actionLoading ? "Revoking..." : "Revoke Verification"}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-body-md text-on-surface-variant">
-            Revoking verified status for <strong>{user.name}</strong>. They will
-            need to resubmit their document.
-          </p>
-          <Textarea
-            label="Reason"
-            value={unverifyReason}
-            onChange={(e) => setUnverifyReason(e.target.value)}
-            placeholder="e.g. Document appears fraudulent. Please resubmit authentic ID."
-            rows={3}
-          />
-        </div>
-      </Modal>
-
-      {/* Document Viewer Modal */}
+      {/* ── Document Viewer Modal ─────────────────────────────────────── */}
       <Modal
         isOpen={docModalOpen}
         onClose={() => setDocModalOpen(false)}
@@ -594,6 +612,114 @@ export const UserDetails = () => {
               style={{ display: "none" }}
             />
           </div>
+        </div>
+      </Modal>
+
+      {/* ── Edit User Modal ───────────────────────────────────────────── */}
+      <Modal
+        isOpen={editModal}
+        onClose={() => setEditModal(false)}
+        title={`Edit User — ${user.name}`}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setEditModal(false)}
+              disabled={editLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleEditSave}
+              disabled={editLoading}
+            >
+              {editLoading ? "Saving..." : "Save Changes"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          {editError && (
+            <div className="bg-error-container/20 border border-error/40 text-error p-3 rounded-lg text-sm font-semibold flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">warning</span>
+              {editError}
+            </div>
+          )}
+          <Input
+            label="Full Name *"
+            value={editFields.name || ""}
+            onChange={(e) =>
+              setEditFields((p) => ({ ...p, name: e.target.value }))
+            }
+            required
+          />
+          <Input
+            label="Phone Number"
+            value={editFields.phone || ""}
+            onChange={(e) =>
+              setEditFields((p) => ({ ...p, phone: e.target.value }))
+            }
+            placeholder="e.g. 9812345678"
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="City"
+              value={editFields.city || ""}
+              onChange={(e) =>
+                setEditFields((p) => ({ ...p, city: e.target.value }))
+              }
+            />
+            <Input
+              label="Age"
+              type="number"
+              value={editFields.age || ""}
+              onChange={(e) =>
+                setEditFields((p) => ({ ...p, age: e.target.value }))
+              }
+              min="16"
+              max="100"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="University"
+              value={editFields.university || ""}
+              onChange={(e) =>
+                setEditFields((p) => ({ ...p, university: e.target.value }))
+              }
+            />
+            <Input
+              label="Major"
+              value={editFields.major || ""}
+              onChange={(e) =>
+                setEditFields((p) => ({ ...p, major: e.target.value }))
+              }
+            />
+          </div>
+          <Select
+            label="Gender"
+            value={editFields.gender || ""}
+            onChange={(e) =>
+              setEditFields((p) => ({ ...p, gender: e.target.value }))
+            }
+            options={[
+              { value: "", label: "Not specified" },
+              { value: "Male", label: "Male" },
+              { value: "Female", label: "Female" },
+              { value: "Non-binary", label: "Non-binary" },
+              { value: "Other", label: "Other" },
+            ]}
+          />
+          <Textarea
+            label="Bio"
+            value={editFields.bio || ""}
+            onChange={(e) =>
+              setEditFields((p) => ({ ...p, bio: e.target.value }))
+            }
+            rows={3}
+            placeholder="User biography..."
+          />
         </div>
       </Modal>
     </div>
