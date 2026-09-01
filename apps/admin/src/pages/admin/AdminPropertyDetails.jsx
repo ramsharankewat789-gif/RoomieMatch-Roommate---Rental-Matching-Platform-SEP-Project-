@@ -140,19 +140,43 @@ export const AdminPropertyDetails = () => {
           {/* Image gallery */}
           <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant overflow-hidden">
             {coverImage ? (
-              <div className="grid grid-cols-4 grid-rows-2 gap-1 h-80">
-                <div className="col-span-4 md:col-span-3 row-span-2 overflow-hidden">
-                  <img src={coverImage} alt={property.title} className="w-full h-full object-cover" />
-                </div>
-                {(property.images || []).slice(1, 3).map((img, i) => (
-                  <div key={i} className="hidden md:block col-span-1 row-span-1 overflow-hidden">
-                    <img src={img} alt={`${property.title} ${i + 2}`} className="w-full h-full object-cover" />
+              <>
+                {/* Main cover + side thumbnails grid */}
+                <div className="grid grid-cols-4 grid-rows-2 gap-1 h-80">
+                  <div className="col-span-4 md:col-span-3 row-span-2 overflow-hidden">
+                    <img src={coverImage} alt={property.title} className="w-full h-full object-cover" />
                   </div>
-                ))}
-              </div>
+                  {(property.images || []).slice(1, 3).map((img, i) => (
+                    <div key={i} className="hidden md:block col-span-1 row-span-1 overflow-hidden">
+                      <img src={img} alt={`${property.title} ${i + 2}`} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+                {/* All images scrollable strip */}
+                {(property.images || []).length > 1 && (
+                  <div className="p-3 border-t border-outline-variant/60 bg-surface-container-low">
+                    <p className="text-xs text-outline font-semibold uppercase tracking-wider mb-2">
+                      All Images ({property.images.length})
+                    </p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {(property.images || []).map((img, i) => (
+                        <a key={i} href={img} target="_blank" rel="noopener noreferrer" title={`Image ${i + 1}`}>
+                          <img
+                            src={img}
+                            alt={`${property.title} ${i + 1}`}
+                            className="w-24 h-16 object-cover rounded-lg border-2 border-outline-variant hover:border-primary transition-colors shrink-0 cursor-pointer"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-outline mt-1">Click any thumbnail to open full size</p>
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="h-48 flex items-center justify-center text-outline bg-surface-container">
+              <div className="h-48 flex flex-col items-center justify-center text-outline bg-surface-container gap-2">
                 <span className="material-symbols-outlined text-[64px]">home_work</span>
+                <p className="text-sm font-semibold">No images uploaded</p>
               </div>
             )}
           </div>
@@ -176,7 +200,7 @@ export const AdminPropertyDetails = () => {
               </div>
               <div className="text-right">
                 <div className="font-headline-lg text-headline-lg text-primary">
-                  ${property.price}
+                  Rs. {Number(property.price).toLocaleString()}
                   <span className="font-body-md text-body-md text-on-surface-variant font-normal">/mo</span>
                 </div>
                 {property.available_from && (

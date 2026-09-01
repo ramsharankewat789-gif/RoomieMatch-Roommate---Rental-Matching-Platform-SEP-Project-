@@ -7,29 +7,34 @@
  */
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { apiListUsers, apiDeleteUser } from "@shared/services/api";
+import {
+  apiListUsers,
+  apiDeleteUser,
+  apiBlockUser,
+  apiUnblockUser,
+} from "@shared/services/api";
 import Input from "@shared/components/common/Input";
 import Select from "@shared/components/common/Select";
 import StatusBadge from "@shared/components/common/StatusBadge";
 import Avatar from "@shared/components/common/Avatar";
 
 export const UserManagement = () => {
-  const [users, setUsers]           = useState([]);
+  const [users, setUsers] = useState([]);
   const [pagination, setPagination] = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [search, setSearch]         = useState("");
+  const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
-  const [page, setPage]             = useState(1);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const params = { page, limit: 20 };
-      if (search)     params.search = search;
-      if (roleFilter) params.role   = roleFilter;
+      if (search) params.search = search;
+      if (roleFilter) params.role = roleFilter;
       const data = await apiListUsers(params);
       setUsers(data.users || []);
       setPagination(data.pagination || null);
@@ -42,26 +47,66 @@ export const UserManagement = () => {
 
   // Debounce search: re-fetch 400ms after user stops typing
   useEffect(() => {
-    const t = setTimeout(() => { setPage(1); load(); }, 400);
+    const t = setTimeout(() => {
+      setPage(1);
+      load();
+    }, 400);
     return () => clearTimeout(t);
   }, [search, roleFilter]);
 
-  useEffect(() => { load(); }, [page]);
+  useEffect(() => {
+    load();
+  }, [page]);
 
   const handleDelete = async (userId, userName) => {
-    if (!window.confirm(`Delete ${userName}? This removes all their data permanently.`)) return;
+    if (
+      !window.confirm(
+        `Delete ${userName}? This removes all their data permanently.`,
+      )
+    )
+      return;
     try {
       await apiDeleteUser(userId);
-      setUsers(prev => prev.filter(u => u.id !== userId));
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
     } catch (err) {
       alert(err.message || "Failed to delete user.");
+    }
+  };
+
+  const handleBlock = async (userId, userName) => {
+    if (
+      !window.confirm(
+        `Block ${userName}? They will no longer be able to log in.`,
+      )
+    )
+      return;
+    try {
+      await apiBlockUser(userId);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, is_blocked: 1 } : u)),
+      );
+    } catch (err) {
+      alert(err.message || "Failed to block user.");
+    }
+  };
+
+  const handleUnblock = async (userId, userName) => {
+    try {
+      await apiUnblockUser(userId);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, is_blocked: 0 } : u)),
+      );
+    } catch (err) {
+      alert(err.message || "Failed to unblock user.");
     }
   };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="font-headline-md text-headline-md text-on-surface font-bold">User Management</h1>
+        <h1 className="font-headline-md text-headline-md text-on-surface font-bold">
+          User Management
+        </h1>
         <p className="font-body-md text-body-md text-on-surface-variant mt-1">
           Review, approve, and audit student and landlord member profiles
         </p>
@@ -79,10 +124,13 @@ export const UserManagement = () => {
         <div className="w-52 shrink-0">
           <Select
             value={roleFilter}
-            onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setRoleFilter(e.target.value);
+              setPage(1);
+            }}
             options={[
-              { value: "",      label: "All Roles" },
-              { value: "user",  label: "Users (Tenant / Owner)" },
+              { value: "", label: "All Roles" },
+              { value: "user", label: "Users (Tenant / Owner)" },
               { value: "admin", label: "Administrators" },
             ]}
           />
@@ -92,7 +140,8 @@ export const UserManagement = () => {
       {/* Error */}
       {error && (
         <div className="bg-error-container/20 border border-error/40 text-error p-3 rounded-xl text-sm flex items-center gap-2">
-          <span className="material-symbols-outlined text-sm">warning</span>{error}
+          <span className="material-symbols-outlined text-sm">warning</span>
+          {error}
         </div>
       )}
 
@@ -106,22 +155,31 @@ export const UserManagement = () => {
                 <th className="px-6 py-4">Email</th>
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Verification</th>
+                <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/60 bg-surface-container-lowest font-body-md text-body-md text-on-surface">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-8 text-center text-on-surface-variant">
+                  <td
+                    colSpan="6"
+                    className="px-6 py-8 text-center text-on-surface-variant"
+                  >
                     <span className="flex items-center justify-center gap-2">
-                      <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                      <span className="material-symbols-outlined text-[18px] animate-spin">
+                        progress_activity
+                      </span>
                       Loading users...
                     </span>
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-8 text-center text-on-surface-variant">
+                  <td
+                    colSpan="6"
+                    className="px-6 py-8 text-center text-on-surface-variant"
+                  >
                     No users match your search.
                   </td>
                 </tr>
@@ -129,8 +187,15 @@ export const UserManagement = () => {
                 users.map((user) => (
                   <tr key={user.id} className="hover:bg-surface-container/20">
                     <td className="px-6 py-4">
-                      <Link to={`/admin/users/${user.id}`} className="flex items-center gap-3 hover:opacity-80">
-                        <Avatar src={user.profile_image} name={user.name} size="sm" />
+                      <Link
+                        to={`/admin/users/${user.id}`}
+                        className="flex items-center gap-3 hover:opacity-80"
+                      >
+                        <Avatar
+                          src={user.profile_image}
+                          name={user.name}
+                          size="sm"
+                        />
                         <div>
                           <span className="font-bold block">{user.name}</span>
                           <span className="text-xs text-outline font-semibold capitalize">
@@ -139,15 +204,41 @@ export const UserManagement = () => {
                         </div>
                       </Link>
                     </td>
-                    <td className="px-6 py-4 text-on-surface-variant">{user.email}</td>
-                    <td className="px-6 py-4 capitalize font-semibold">{user.role}</td>
+                    <td className="px-6 py-4 text-on-surface-variant">
+                      {user.email}
+                    </td>
+                    <td className="px-6 py-4 capitalize font-semibold">
+                      {user.role}
+                    </td>
                     <td className="px-6 py-4">
-                      <StatusBadge status={
-                        user.verification_status === "APPROVED" ? "verified"
-                        : user.verification_status === "PENDING"  ? "pending"
-                        : user.is_verified ? "verified"
-                        : "unverified"
-                      } />
+                      <StatusBadge
+                        status={
+                          user.verification_status === "APPROVED"
+                            ? "verified"
+                            : user.verification_status === "PENDING"
+                              ? "pending"
+                              : user.is_verified
+                                ? "verified"
+                                : "unverified"
+                        }
+                      />
+                    </td>
+                    <td className="px-6 py-4">
+                      {user.is_blocked ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-error-container text-error border border-error/30">
+                          <span className="material-symbols-outlined text-[12px]">
+                            block
+                          </span>
+                          Blocked
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-secondary-container/40 text-secondary">
+                          <span className="material-symbols-outlined text-[12px]">
+                            check_circle
+                          </span>
+                          Active
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <Link
@@ -157,12 +248,29 @@ export const UserManagement = () => {
                         View
                       </Link>
                       {user.role !== "admin" && (
-                        <button
-                          onClick={() => handleDelete(user.id, user.name)}
-                          className="px-3 py-1.5 border border-error/40 text-error rounded-lg text-xs font-bold hover:bg-error-container/10 transition-colors"
-                        >
-                          Delete
-                        </button>
+                        <>
+                          {user.is_blocked ? (
+                            <button
+                              onClick={() => handleUnblock(user.id, user.name)}
+                              className="px-3 py-1.5 border border-secondary/40 text-secondary rounded-lg text-xs font-bold hover:bg-secondary-container/10 transition-colors"
+                            >
+                              Unblock
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleBlock(user.id, user.name)}
+                              className="px-3 py-1.5 border border-error/40 text-error rounded-lg text-xs font-bold hover:bg-error-container/10 transition-colors"
+                            >
+                              Block
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(user.id, user.name)}
+                            className="px-3 py-1.5 border border-error/40 text-error rounded-lg text-xs font-bold hover:bg-error-container/10 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -178,15 +286,19 @@ export const UserManagement = () => {
             <span>{pagination.total} users total</span>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
                 className="px-3 py-1.5 border border-outline-variant rounded-lg text-xs font-bold disabled:opacity-40 hover:bg-surface-container-low transition-colors"
               >
                 Previous
               </button>
-              <span className="font-semibold text-on-surface">Page {page} / {pagination.pages}</span>
+              <span className="font-semibold text-on-surface">
+                Page {page} / {pagination.pages}
+              </span>
               <button
-                onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
+                onClick={() =>
+                  setPage((p) => Math.min(pagination.pages, p + 1))
+                }
                 disabled={page >= pagination.pages}
                 className="px-3 py-1.5 border border-outline-variant rounded-lg text-xs font-bold disabled:opacity-40 hover:bg-surface-container-low transition-colors"
               >

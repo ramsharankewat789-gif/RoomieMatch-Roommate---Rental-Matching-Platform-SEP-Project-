@@ -14,7 +14,9 @@ const { get } = require("../database/db");
 async function requireAuth(req, res, next) {
   try {
     const header = req.headers.authorization || "";
-    const token  = header.startsWith("Bearer ") ? header.slice(7) : null;
+    // Also accept token from query string (needed for iframe/img doc viewer)
+    const token  = header.startsWith("Bearer ") ? header.slice(7)
+                 : req.query.token || null;
 
     if (!token) {
       return res.status(401).json({ error: "Authentication required." });
@@ -24,11 +26,14 @@ async function requireAuth(req, res, next) {
 
     // Confirm user still exists in MySQL
     const user = await get(
-      "SELECT id, email, role, name FROM users WHERE id = ?",
+      "SELECT id, email, role, name, is_blocked FROM users WHERE id = ?",
       [payload.sub]
     );
     if (!user) {
       return res.status(401).json({ error: "User not found." });
+    }
+    if (user.is_blocked) {
+      return res.status(403).json({ error: "Your account has been suspended. Please contact support." });
     }
 
     req.user = user;

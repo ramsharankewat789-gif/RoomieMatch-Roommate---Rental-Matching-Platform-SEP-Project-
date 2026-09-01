@@ -140,6 +140,10 @@ async function login(req, res) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
+    if (user.is_blocked) {
+      return res.status(403).json({ error: "Your account has been suspended. Please contact support." });
+    }
+
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(401).json({ error: "Invalid email or password." });

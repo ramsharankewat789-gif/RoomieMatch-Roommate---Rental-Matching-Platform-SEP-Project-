@@ -84,7 +84,7 @@ export const OwnerMessages = () => {
   };
 
   const activeThread    = getThread(activeThreadId);
-  const displayMessages = activeConvId === activeThreadId ? activeMessages : [];
+  const displayMessages = activeMessages;
   const activeTypers    = (typingUsers[activeThreadId] || []).filter(u => u.userId !== currentUser?.id);
 
   return (
@@ -191,7 +191,7 @@ export const OwnerMessages = () => {
                 <div className="hidden sm:flex items-center gap-2 bg-surface-container-high px-3 py-1 rounded-lg border border-outline-variant text-xs">
                   <span className="material-symbols-outlined text-[16px] text-primary">home</span>
                   <span className="font-bold text-on-surface truncate max-w-xs">{activeThread.property.title}</span>
-                  <span className="text-primary font-bold">(${activeThread.property.price})</span>
+                  <span className="text-primary font-bold">(Rs. {Number(activeThread.property.price).toLocaleString()})</span>
                 </div>
               )}
             </div>

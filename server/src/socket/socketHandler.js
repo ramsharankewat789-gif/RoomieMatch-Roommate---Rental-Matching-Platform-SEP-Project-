@@ -144,7 +144,7 @@ function registerSocketHandlers(io) {
 
         // Fetch full message with sender info for broadcast
         const msg = await get(
-          `SELECT m.id, m.sender_id, m.body, m.is_read, m.created_at,
+          `SELECT m.id, m.conversation_id, m.sender_id, m.body, m.is_read, m.created_at,
                   u.name AS sender_name, u.profile_image AS sender_image
            FROM messages m JOIN users u ON m.sender_id = u.id
            WHERE m.id = ?`,

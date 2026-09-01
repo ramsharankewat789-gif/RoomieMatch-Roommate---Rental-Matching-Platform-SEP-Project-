@@ -154,7 +154,7 @@ export const PropertyManagement = () => {
                   <tr key={p.id} className="hover:bg-surface-container/20">
                     <td className="px-6 py-4">
                       <Link to={`/admin/properties/${p.id}`} className="flex items-center gap-3 hover:opacity-80">
-                        <div className="w-12 h-10 bg-surface-container-high rounded border border-outline-variant/60 overflow-hidden shrink-0">
+                        <div className="w-14 h-12 bg-surface-container-high rounded border border-outline-variant/60 overflow-hidden shrink-0 relative">
                           {p.cover_image || (p.images && p.images[0]) ? (
                             <img
                               src={p.cover_image || p.images[0]}
@@ -165,6 +165,11 @@ export const PropertyManagement = () => {
                             <div className="w-full h-full flex items-center justify-center text-outline">
                               <span className="material-symbols-outlined text-[18px]">home</span>
                             </div>
+                          )}
+                          {p.images && p.images.length > 0 && (
+                            <span className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] font-bold px-1 rounded-tl">
+                              {p.images.length}
+                            </span>
                           )}
                         </div>
                         <div>
@@ -178,7 +183,7 @@ export const PropertyManagement = () => {
                     <td className="px-6 py-4 text-on-surface-variant truncate max-w-xs">
                       {p.address}, {p.city}
                     </td>
-                    <td className="px-6 py-4 font-bold text-primary">${p.price}/mo</td>
+                    <td className="px-6 py-4 font-bold text-primary">Rs. {Number(p.price).toLocaleString()}/mo</td>
                     <td className="px-6 py-4"><StatusBadge status={p.status} /></td>
                     <td className="px-6 py-4">
                       <StatusBadge status={p.is_verified ? "verified" : "unverified"} />

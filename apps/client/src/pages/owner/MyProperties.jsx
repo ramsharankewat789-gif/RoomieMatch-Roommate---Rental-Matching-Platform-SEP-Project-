@@ -139,7 +139,7 @@ export const MyProperties = () => {
                   {/* Actions row */}
                   <div className="pt-4 border-t border-outline-variant/60 flex items-center justify-between gap-2">
                     <span className="font-headline-sm text-headline-sm text-primary font-bold">
-                      ${prop.price}<span className="text-xs text-outline font-normal">/mo</span>
+                      Rs. {Number(prop.price).toLocaleString()}<span className="text-xs text-outline font-normal">/mo</span>
                     </span>
 
                     <div className="flex items-center gap-1">

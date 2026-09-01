@@ -471,6 +471,62 @@ function serveStaticUpload(req, res) {
   res.sendFile(filePath);
 }
 
+// ── Admin: list ALL verifications (all statuses) ───────────────────────────
+async function listAllVerifications(req, res) {
+  try {
+    const statusFilter = req.query.status || null;
+    const params = [];
+    let where = "";
+    if (statusFilter) { where = "WHERE vd.status = ?"; params.push(statusFilter); }
+
+    const rows = await all(
+      `SELECT vd.id, vd.user_id, vd.document_type, vd.status,
+              vd.submitted_at, vd.reviewed_at, vd.rejection_reason,
+              u.name, u.email, u.role, u.is_verified
+       FROM verification_docs vd
+       JOIN users u ON vd.user_id = u.id
+       ${where}
+       ORDER BY vd.submitted_at DESC`,
+      params
+    );
+
+    return res.json({
+      verifications: rows.map(r => ({
+        ...r,
+        submitted_at: isoDate(r.submitted_at),
+        reviewed_at:  isoDate(r.reviewed_at)
+      }))
+    });
+  } catch (err) {
+    console.error("[ListAllVerifications]", err.message);
+    return res.status(500).json({ error: "Failed to fetch verifications." });
+  }
+}
+
+// ── Admin: revoke a previously approved verification ──────────────────────
+async function unverifyUser(req, res) {
+  try {
+    const { userId } = req.params;
+    const reason = (req.body.reason || "Verification revoked by administrator.").trim();
+
+    const doc = await get("SELECT id FROM verification_docs WHERE user_id = ?", [userId]);
+    if (!doc) return res.status(404).json({ error: "No verification submission found." });
+
+    await run(
+      `UPDATE verification_docs
+       SET status = 'REJECTED', reviewed_at = NOW(), reviewed_by = ?, rejection_reason = ?
+       WHERE user_id = ?`,
+      [req.user.id, reason, userId]
+    );
+    await run("UPDATE users SET is_verified = 0 WHERE id = ?", [userId]);
+
+    return res.json({ message: "User verification revoked." });
+  } catch (err) {
+    console.error("[UnverifyUser]", err.message);
+    return res.status(500).json({ error: "Failed to unverify user." });
+  }
+}
+
 module.exports = {
   uploadProfileImage,
   deleteProfileImage,
@@ -480,6 +536,8 @@ module.exports = {
   approveVerification,
   rejectVerification,
   listPendingVerifications,
+  listAllVerifications,
+  unverifyUser,
   uploadPropertyImages,
   getPropertyImages,
   deletePropertyImage,

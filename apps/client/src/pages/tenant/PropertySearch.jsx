@@ -158,7 +158,7 @@ export const PropertySearch = () => {
             icon="location_city"
           />
           <Input
-            placeholder="Max Budget ($ / month)"
+            placeholder="Max Budget (Rs. / month)"
             type="number"
             value={maxPrice}
             onChange={(e) => setMaxPrice(e.target.value)}

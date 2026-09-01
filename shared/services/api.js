@@ -156,6 +156,26 @@ export async function apiDeleteUser(userId) {
   return handleResponse(res);
 }
 
+/** Admin: block a user account. */
+export async function apiBlockUser(userId) {
+  const res = await fetch(`${BASE_URL}/users/${userId}/block`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({})
+  });
+  return handleResponse(res);
+}
+
+/** Admin: unblock a user account. */
+export async function apiUnblockUser(userId) {
+  const res = await fetch(`${BASE_URL}/users/${userId}/unblock`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({})
+  });
+  return handleResponse(res);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFILE IMAGE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -210,6 +230,23 @@ export function apiVerificationDocUrl(userId) {
 export async function apiListPendingVerifications() {
   const res = await fetch(`${BASE_URL}/verification/pending`, {
     headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiListAllVerifications(status) {
+  const qs = status ? `?status=${status}` : "";
+  const res = await fetch(`${BASE_URL}/verification/all${qs}`, {
+    headers: authHeaders()
+  });
+  return handleResponse(res);
+}
+
+export async function apiUnverifyUser(userId, reason) {
+  const res = await fetch(`${BASE_URL}/verification/${userId}/unverify`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ reason: reason || "" })
   });
   return handleResponse(res);
 }

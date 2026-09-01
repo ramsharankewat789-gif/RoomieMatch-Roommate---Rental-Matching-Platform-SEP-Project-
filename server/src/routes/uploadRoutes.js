@@ -17,6 +17,8 @@ const {
   serveVerificationDoc,
   approveVerification,
   rejectVerification,
+  unverifyUser,
+  listAllVerifications,
   listPendingVerifications,
   uploadPropertyImages,
   deletePropertyImage,
@@ -47,7 +49,9 @@ router.get("/verification/status",          requireAuth,               getMyVeri
 router.get("/verification/doc/:userId",     requireAuth,               serveVerificationDoc);
 router.post("/verification/:userId/approve",requireAuth, requireAdmin,  approveVerification);
 router.post("/verification/:userId/reject", requireAuth, requireAdmin,  rejectVerification);
+router.post("/verification/:userId/unverify",requireAuth, requireAdmin, unverifyUser);
 router.get("/verification/pending",         requireAuth, requireAdmin,  listPendingVerifications);
+router.get("/verification/all",             requireAuth, requireAdmin,  listAllVerifications);
 
 // ── Property images ────────────────────────────────────────────────────────
 router.get("/properties/:propertyId/images",               requireAuth, getPropertyImages);

@@ -211,9 +211,9 @@ export const RoommateSearch = () => {
                 <span className="text-xs text-outline font-semibold">
                   Budget: {
                     item.budget_min && item.budget_max
-                      ? `$${item.budget_min} – $${item.budget_max}/mo`
+                      ? `Rs. ${Number(item.budget_min).toLocaleString()} – Rs. ${Number(item.budget_max).toLocaleString()}/mo`
                       : item.budget_min
-                        ? `From $${item.budget_min}/mo`
+                        ? `From Rs. ${Number(item.budget_min).toLocaleString()}/mo`
                         : "Not specified"
                   }
                 </span>

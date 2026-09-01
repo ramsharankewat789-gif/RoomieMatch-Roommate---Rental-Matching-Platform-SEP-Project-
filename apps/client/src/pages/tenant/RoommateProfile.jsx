@@ -145,8 +145,8 @@ export const RoommateProfile = () => {
     : 0;
 
   const budgetDisplay = user.budget_min && user.budget_max
-    ? `$${user.budget_min} – $${user.budget_max}/mo`
-    : user.budget_min ? `From $${user.budget_min}/mo` : "Not specified";
+    ? `Rs. ${Number(user.budget_min).toLocaleString()} – Rs. ${Number(user.budget_max).toLocaleString()}/mo`
+    : user.budget_min ? `From Rs. ${Number(user.budget_min).toLocaleString()}/mo` : "Not specified";
 
   return (
     <>

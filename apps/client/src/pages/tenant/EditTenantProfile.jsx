@@ -192,7 +192,7 @@ export const EditTenantProfile = () => {
 
         {/* Budget — two number inputs, maps to budget_min / budget_max */}
         <div className="space-y-1">
-          <span className="block font-label-md text-label-md text-on-surface">Monthly Budget Range ($/month)</span>
+          <span className="block font-label-md text-label-md text-on-surface">Monthly Budget Range (Rs./month)</span>
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Minimum" type="number" min="0"
@@ -207,7 +207,7 @@ export const EditTenantProfile = () => {
           </div>
           {budgetMin && budgetMax && (
             <p className="text-xs text-on-surface-variant mt-1">
-              Budget: ${Number(budgetMin).toLocaleString()} – ${Number(budgetMax).toLocaleString()} /month
+              Budget: Rs. {Number(budgetMin).toLocaleString()} – Rs. {Number(budgetMax).toLocaleString()} /month
             </p>
           )}
         </div>

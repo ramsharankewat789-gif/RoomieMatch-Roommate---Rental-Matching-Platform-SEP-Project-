@@ -230,7 +230,7 @@ export const AdminDashboard = () => {
               <div key={p.id} className="flex justify-between items-center text-sm">
                 <div className="min-w-0 flex-1">
                   <span className="font-semibold text-on-surface truncate block">{p.title}</span>
-                  <span className="text-xs text-outline">{p.owner_name} · ${p.price}/mo</span>
+                  <span className="text-xs text-outline">{p.owner_name} · Rs. {Number(p.price).toLocaleString()}/mo</span>
                 </div>
                 <StatusBadge status={p.is_verified ? "verified" : "unverified"} />
               </div>

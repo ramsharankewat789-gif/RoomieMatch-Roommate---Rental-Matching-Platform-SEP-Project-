@@ -17,7 +17,9 @@ const {
   getUser,
   updateUser,
   deleteUser,
-  getUserVerification
+  getUserVerification,
+  blockUser,
+  unblockUser,
 } = require("../controllers/userController");
 
 const profileUpdateLimiter = rateLimit({
@@ -28,10 +30,12 @@ const profileUpdateLimiter = rateLimit({
 
 // Admin: full list with all fields
 // Authenticated non-admin: public-safe subset (for roommate matching)
-router.get("/",                   requireAuth,                     listUsers);
-router.get("/:id",                requireAuth,                     getUser);
+router.get("/",                   requireAuth,                      listUsers);
+router.get("/:id",                requireAuth,                      getUser);
 router.patch("/:id",              requireAuth, profileUpdateLimiter, updateUser);
-router.delete("/:id",             requireAuth, requireAdmin,       deleteUser);
-router.get("/:id/verification",   requireAuth,                     getUserVerification);
+router.delete("/:id",             requireAuth, requireAdmin,         deleteUser);
+router.get("/:id/verification",   requireAuth,                       getUserVerification);
+router.patch("/:id/block",        requireAuth, requireAdmin,         blockUser);
+router.patch("/:id/unblock",      requireAuth, requireAdmin,         unblockUser);
 
 module.exports = router;

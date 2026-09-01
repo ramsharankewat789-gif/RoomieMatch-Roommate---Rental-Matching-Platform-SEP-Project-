@@ -295,13 +295,53 @@ async function deleteUser(req, res) {
     const existing = await get("SELECT id FROM users WHERE id = ?", [id]);
     if (!existing) return res.status(404).json({ error: "User not found." });
 
-    // Cascade deletes handle related rows via FK constraints
     await run("DELETE FROM users WHERE id = ?", [id]);
 
     return res.json({ message: "User account deleted." });
   } catch (err) {
     console.error("[DeleteUser]", err.message);
     return res.status(500).json({ error: "Failed to delete user." });
+  }
+}
+
+// ── PATCH /api/users/:id/block  (admin only) ──────────────────────────────
+async function blockUser(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (id === req.user.id) {
+      return res.status(400).json({ error: "Admins cannot block their own account." });
+    }
+
+    const existing = await get("SELECT id, name, role FROM users WHERE id = ?", [id]);
+    if (!existing) return res.status(404).json({ error: "User not found." });
+    if (existing.role === "admin") {
+      return res.status(400).json({ error: "Admin accounts cannot be blocked." });
+    }
+
+    await run("UPDATE users SET is_blocked = 1 WHERE id = ?", [id]);
+
+    return res.json({ message: `${existing.name} has been blocked.` });
+  } catch (err) {
+    console.error("[BlockUser]", err.message);
+    return res.status(500).json({ error: "Failed to block user." });
+  }
+}
+
+// ── PATCH /api/users/:id/unblock  (admin only) ────────────────────────────
+async function unblockUser(req, res) {
+  try {
+    const { id } = req.params;
+
+    const existing = await get("SELECT id, name FROM users WHERE id = ?", [id]);
+    if (!existing) return res.status(404).json({ error: "User not found." });
+
+    await run("UPDATE users SET is_blocked = 0 WHERE id = ?", [id]);
+
+    return res.json({ message: `${existing.name} has been unblocked.` });
+  } catch (err) {
+    console.error("[UnblockUser]", err.message);
+    return res.status(500).json({ error: "Failed to unblock user." });
   }
 }
 
@@ -340,5 +380,7 @@ module.exports = {
   updateUser,
   deleteUser,
   getUserVerification,
-  buildUserResponse   // exported so authController can import it too
+  buildUserResponse,
+  blockUser,
+  unblockUser,
 };

@@ -110,7 +110,7 @@ export const TenantDashboard = () => {
                     <span className="text-xs text-outline font-medium">
                       Budget: {
                         roommate.budget_min && roommate.budget_max
-                          ? `$${roommate.budget_min} - $${roommate.budget_max}`
+                          ? `Rs. ${Number(roommate.budget_min).toLocaleString()} - Rs. ${Number(roommate.budget_max).toLocaleString()}`
                           : roommate.budget || "Not specified"
                       }
                     </span>

@@ -114,7 +114,7 @@ const PropertyMap = ({
                 <p className="font-bold">{p.title}</p>
                 {p.address && <p className="text-gray-500 text-xs mt-0.5">{p.address}</p>}
                 {p.price && (
-                  <p className="text-blue-700 font-bold mt-1">${p.price}/mo</p>
+                  <p className="text-blue-700 font-bold mt-1">Rs. {Number(p.price).toLocaleString()}/mo</p>
                 )}
                 {p.id && (
                   <a

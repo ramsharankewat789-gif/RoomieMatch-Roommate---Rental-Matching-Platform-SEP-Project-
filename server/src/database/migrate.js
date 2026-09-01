@@ -6,27 +6,30 @@
  * Safe to run multiple times — all statements use CREATE TABLE IF NOT EXISTS.
  * Tables are created in dependency order (parents before children).
  */
-require("dotenv").config({ path: require("path").resolve(__dirname, "../../.env") });
+require("dotenv").config({
+  path: require("path").resolve(__dirname, "../../.env"),
+});
 const mysql = require("mysql2/promise");
 
 async function migrate() {
   // Connect without specifying a database first so we can CREATE it
   const conn = await mysql.createConnection({
-    host:     process.env.DB_HOST     || "localhost",
-    port:     Number(process.env.DB_PORT) || 3306,
-    user:     process.env.DB_USER     || "root",
+    host: process.env.DB_HOST || "localhost",
+    port: Number(process.env.DB_PORT) || 3306,
+    user: process.env.DB_USER || "root",
     password: process.env.DB_PASSWORD || "",
     multipleStatements: true,
   });
 
   const db = process.env.DB_NAME || "roomiematch";
   console.log(`[Migrate] Creating database '${db}' if it does not exist...`);
-  await conn.query(`CREATE DATABASE IF NOT EXISTS \`${db}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  await conn.query(
+    `CREATE DATABASE IF NOT EXISTS \`${db}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  );
   await conn.query(`USE \`${db}\``);
   console.log(`[Migrate] Using database '${db}'.`);
 
   const tables = [
-
     // ── 1. users ──────────────────────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS users (
       id             VARCHAR(36)   NOT NULL,
@@ -46,6 +49,7 @@ async function migrate() {
       budget_max     INT UNSIGNED  NULL,
       bio            TEXT          NULL,
       is_verified    TINYINT(1)    NOT NULL DEFAULT 0,
+      is_blocked     TINYINT(1)    NOT NULL DEFAULT 0,
       email_verified TINYINT(1)    NOT NULL DEFAULT 0,
       created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -385,15 +389,15 @@ async function migrate() {
       CONSTRAINT fk_cs_user      FOREIGN KEY (user_id)      REFERENCES users(id) ON DELETE CASCADE,
       CONSTRAINT fk_cs_candidate FOREIGN KEY (candidate_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-
   ];
 
-    // ── 21. email_verification_tokens ──────────────────────────────────
-    // (This block was erroneously placed — moved to proper array entry above)
+  // ── 21. email_verification_tokens ──────────────────────────────────
+  // (This block was erroneously placed — moved to proper array entry above)
 
   let created = 0;
   for (const ddl of tables) {
-    const tableName = (ddl.match(/CREATE TABLE IF NOT EXISTS (\w+)/) || [])[1] || "?";
+    const tableName =
+      (ddl.match(/CREATE TABLE IF NOT EXISTS (\w+)/) || [])[1] || "?";
     try {
       await conn.query(ddl);
       console.log(`  ✓ ${tableName}`);

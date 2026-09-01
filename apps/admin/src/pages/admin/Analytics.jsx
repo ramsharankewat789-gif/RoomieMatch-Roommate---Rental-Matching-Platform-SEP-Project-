@@ -110,7 +110,7 @@ export const Analytics = () => {
             <StatRow label="Active Reports"          value={pendingReports} />
             <div className="flex justify-between pt-2 border-t border-outline-variant/60">
               <span>Est. Monthly Rent Value</span>
-              <span className="font-bold text-secondary">${monthlyRent.toLocaleString()}</span>
+              <span className="font-bold text-secondary">Rs. {monthlyRent.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -132,7 +132,7 @@ export const Analytics = () => {
             { label: "Users",        value: totalUsers,       icon: "group" },
             { label: "Properties",   value: totalProperties,  icon: "home_work" },
             { label: "Applications", value: pendingApps,      icon: "description" },
-            { label: "Monthly Rent", value: `$${monthlyRent.toLocaleString()}`, icon: "payments" },
+            { label: "Monthly Rent", value: `Rs. ${monthlyRent.toLocaleString()}`, icon: "payments" },
           ].map(({ label, value, icon }) => (
             <div key={label} className="bg-surface-container-low p-4 rounded-xl border border-outline-variant text-center">
               <span className="material-symbols-outlined text-[28px] text-primary mb-2 block">{icon}</span>

@@ -166,7 +166,7 @@ export const OwnerPropertyDetails = () => {
                 </div>
               </div>
               <div className="text-right">
-                <span className="font-headline-lg text-headline-lg text-primary block">${property.price}</span>
+                <span className="font-headline-lg text-headline-lg text-primary block">Rs. {Number(property.price).toLocaleString()}</span>
                 <span className="font-body-md text-body-md text-on-surface-variant">per month</span>
               </div>
             </div>

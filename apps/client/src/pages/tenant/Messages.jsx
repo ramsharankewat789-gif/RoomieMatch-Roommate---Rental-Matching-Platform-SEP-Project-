@@ -90,8 +90,8 @@ export const Messages = () => {
     return data.find(p => p.id !== currentUser?.id) || null;
   };
 
-  const activeThread   = getThread(activeThreadId);
-  const displayMessages = activeConvId === activeThreadId ? activeMessages : [];
+  const activeThread    = getThread(activeThreadId);
+  const displayMessages = activeMessages;
 
   // Who is typing in the active conversation?
   const activeTypers = (typingUsers[activeThreadId] || []).filter(u => u.userId !== currentUser?.id);
@@ -214,7 +214,7 @@ export const Messages = () => {
                   <span className="font-bold text-on-surface truncate max-w-xs">
                     {activeThread.property.title}
                   </span>
-                  <span className="text-primary font-bold">(${activeThread.property.price})</span>
+                  <span className="text-primary font-bold">(Rs. {Number(activeThread.property.price).toLocaleString()})</span>
                 </div>
               )}
             </div>
