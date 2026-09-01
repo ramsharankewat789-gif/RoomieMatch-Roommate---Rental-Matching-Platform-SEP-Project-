@@ -14,10 +14,10 @@
  *  - Filenames are UUIDs — original filenames are never stored or exposed
  */
 const path = require("path");
-const fs   = require("fs");
+const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 const { run, get, all } = require("../database/db");
-const { UPLOAD_ROOT }   = require("../middleware/upload");
+const { UPLOAD_ROOT } = require("../middleware/upload");
 
 // ── Internal helpers ───────────────────────────────────────────────────────
 
@@ -51,7 +51,9 @@ async function uploadProfileImage(req, res) {
     const userId = req.user.id;
 
     // Remove previous profile image file if one exists
-    const existing = await get("SELECT profile_image FROM users WHERE id = ?", [userId]);
+    const existing = await get("SELECT profile_image FROM users WHERE id = ?", [
+      userId,
+    ]);
     if (existing?.profile_image) {
       deleteFile("profiles", path.basename(existing.profile_image));
     }
@@ -59,12 +61,15 @@ async function uploadProfileImage(req, res) {
     const imageUrl = fileUrl("profiles", req.file.filename);
 
     // MySQL: updated_at handled by ON UPDATE CURRENT_TIMESTAMP
-    await run(
-      "UPDATE users SET profile_image = ? WHERE id = ?",
-      [imageUrl, userId]
-    );
+    await run("UPDATE users SET profile_image = ? WHERE id = ?", [
+      imageUrl,
+      userId,
+    ]);
 
-    return res.json({ imageUrl, message: "Profile image updated successfully." });
+    return res.json({
+      imageUrl,
+      message: "Profile image updated successfully.",
+    });
   } catch (err) {
     console.error("[UploadProfileImage]", err.message);
     return res.status(500).json({ error: "Failed to upload profile image." });
@@ -73,8 +78,10 @@ async function uploadProfileImage(req, res) {
 
 async function deleteProfileImage(req, res) {
   try {
-    const userId   = req.user.id;
-    const existing = await get("SELECT profile_image FROM users WHERE id = ?", [userId]);
+    const userId = req.user.id;
+    const existing = await get("SELECT profile_image FROM users WHERE id = ?", [
+      userId,
+    ]);
 
     if (existing?.profile_image) {
       deleteFile("profiles", path.basename(existing.profile_image));
@@ -96,14 +103,14 @@ async function uploadVerificationDoc(req, res) {
       return res.status(400).json({ error: "No document file provided." });
     }
 
-    const userId  = req.user.id;
+    const userId = req.user.id;
     const docType = (req.body.document_type || "ID Document").trim();
     const docPath = fileUrl("verifications", req.file.filename);
 
     // Remove old document file if one exists
     const existing = await get(
       "SELECT document_path FROM verification_docs WHERE user_id = ?",
-      [userId]
+      [userId],
     );
     if (existing?.document_path) {
       deleteFile("verifications", path.basename(existing.document_path));
@@ -123,27 +130,29 @@ async function uploadVerificationDoc(req, res) {
          submitted_at     = NOW(),
          reviewed_at      = NULL,
          reviewed_by      = NULL`,
-      [id, userId, docPath, docType]
+      [id, userId, docPath, docType],
     );
 
     return res.status(201).json({
       message: "Verification document submitted. Pending admin review.",
-      status: "PENDING"
+      status: "PENDING",
     });
   } catch (err) {
     console.error("[UploadVerificationDoc]", err.message);
-    return res.status(500).json({ error: "Failed to upload verification document." });
+    return res
+      .status(500)
+      .json({ error: "Failed to upload verification document." });
   }
 }
 
 async function getMyVerificationStatus(req, res) {
   try {
     const userId = req.user.id;
-    const doc    = await get(
+    const doc = await get(
       `SELECT id, document_type, status, rejection_reason,
               submitted_at, reviewed_at
        FROM verification_docs WHERE user_id = ?`,
-      [userId]
+      [userId],
     );
 
     if (!doc) {
@@ -153,11 +162,13 @@ async function getMyVerificationStatus(req, res) {
     return res.json({
       ...doc,
       submitted_at: isoDate(doc.submitted_at),
-      reviewed_at:  isoDate(doc.reviewed_at)
+      reviewed_at: isoDate(doc.reviewed_at),
     });
   } catch (err) {
     console.error("[GetMyVerificationStatus]", err.message);
-    return res.status(500).json({ error: "Failed to fetch verification status." });
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch verification status." });
   }
 }
 
@@ -174,17 +185,21 @@ async function serveVerificationDoc(req, res) {
 
     const doc = await get(
       "SELECT document_path FROM verification_docs WHERE user_id = ?",
-      [userId]
+      [userId],
     );
     if (!doc) {
-      return res.status(404).json({ error: "Verification document not found." });
+      return res
+        .status(404)
+        .json({ error: "Verification document not found." });
     }
 
     const filename = path.basename(doc.document_path);
     const filePath = path.join(UPLOAD_ROOT, "verifications", filename);
 
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "Document file not found on server." });
+      return res
+        .status(404)
+        .json({ error: "Document file not found on server." });
     }
 
     res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
@@ -203,25 +218,53 @@ async function approveVerification(req, res) {
   try {
     const { userId } = req.params;
 
+    // ── Pre-approval checks ───────────────────────────────────────────────
+    const user = await get(
+      "SELECT id, name, age, profile_image FROM users WHERE id = ?",
+      [userId],
+    );
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    // 1. Age must be provided and >= 18
+    if (!user.age || user.age === 0) {
+      return res.status(400).json({
+        error:
+          "Cannot verify: age is not set. User must provide their age before verification.",
+      });
+    }
+    if (user.age < 18) {
+      return res.status(400).json({
+        error: `Cannot verify: user is ${user.age} years old. Users must be 18 or older to be verified.`,
+      });
+    }
+
+    // 2. Profile image must be uploaded
+    if (!user.profile_image) {
+      return res.status(400).json({
+        error:
+          "Cannot verify: profile image is missing. User must upload a profile photo first.",
+      });
+    }
+
+    // 3. Verification document must be submitted
     const doc = await get(
       "SELECT id FROM verification_docs WHERE user_id = ?",
-      [userId]
+      [userId],
     );
     if (!doc) {
-      return res.status(404).json({ error: "No verification submission found." });
+      return res.status(400).json({
+        error: "Cannot verify: no identity document has been submitted.",
+      });
     }
 
     await run(
       `UPDATE verification_docs
        SET status = 'APPROVED', reviewed_at = NOW(), reviewed_by = ?, rejection_reason = NULL
        WHERE user_id = ?`,
-      [req.user.id, userId]
+      [req.user.id, userId],
     );
 
-    await run(
-      "UPDATE users SET is_verified = 1 WHERE id = ?",
-      [userId]
-    );
+    await run("UPDATE users SET is_verified = 1 WHERE id = ?", [userId]);
 
     return res.json({ message: "User verification approved." });
   } catch (err) {
@@ -235,27 +278,28 @@ async function approveVerification(req, res) {
 async function rejectVerification(req, res) {
   try {
     const { userId } = req.params;
-    const reason     = (req.body.reason || "Document could not be verified.").trim();
+    const reason = (
+      req.body.reason || "Document could not be verified."
+    ).trim();
 
     const doc = await get(
       "SELECT id FROM verification_docs WHERE user_id = ?",
-      [userId]
+      [userId],
     );
     if (!doc) {
-      return res.status(404).json({ error: "No verification submission found." });
+      return res
+        .status(404)
+        .json({ error: "No verification submission found." });
     }
 
     await run(
       `UPDATE verification_docs
        SET status = 'REJECTED', reviewed_at = NOW(), reviewed_by = ?, rejection_reason = ?
        WHERE user_id = ?`,
-      [req.user.id, reason, userId]
+      [req.user.id, reason, userId],
     );
 
-    await run(
-      "UPDATE users SET is_verified = 0 WHERE id = ?",
-      [userId]
-    );
+    await run("UPDATE users SET is_verified = 0 WHERE id = ?", [userId]);
 
     return res.json({ message: "User verification rejected." });
   } catch (err) {
@@ -275,15 +319,15 @@ async function listPendingVerifications(req, res) {
        FROM verification_docs vd
        JOIN users u ON vd.user_id = u.id
        WHERE vd.status = 'PENDING'
-       ORDER BY vd.submitted_at ASC`
+       ORDER BY vd.submitted_at ASC`,
     );
 
     return res.json({
-      verifications: rows.map(r => ({
+      verifications: rows.map((r) => ({
         ...r,
         submitted_at: isoDate(r.submitted_at),
-        reviewed_at:  isoDate(r.reviewed_at)
-      }))
+        reviewed_at: isoDate(r.reviewed_at),
+      })),
     });
   } catch (err) {
     console.error("[ListPendingVerifications]", err.message);
@@ -304,7 +348,7 @@ async function uploadPropertyImages(req, res) {
     // Verify property exists and requester is the owner (or admin)
     const property = await get(
       "SELECT id, owner_id FROM properties WHERE id = ?",
-      [propertyId]
+      [propertyId],
     );
     if (!property) {
       return res.status(404).json({ error: "Property not found." });
@@ -316,34 +360,38 @@ async function uploadPropertyImages(req, res) {
     // Check current image count against limit
     const [countRow] = await all(
       "SELECT COUNT(*) AS cnt FROM property_images WHERE property_id = ?",
-      [propertyId]
+      [propertyId],
     );
     const currentCount = countRow?.cnt || 0;
-    const maxImages    = Number(process.env.MAX_PROPERTY_IMAGES) || 6;
+    const maxImages = Number(process.env.MAX_PROPERTY_IMAGES) || 6;
 
     if (currentCount + req.files.length > maxImages) {
-      req.files.forEach(f => deleteFile("properties", f.filename));
+      req.files.forEach((f) => deleteFile("properties", f.filename));
       return res.status(400).json({
-        error: `You can upload up to ${maxImages} property images.`
+        error: `You can upload up to ${maxImages} property images.`,
       });
     }
 
     const isFirstUpload = currentCount === 0;
-    const savedImages   = [];
+    const savedImages = [];
 
     for (let i = 0; i < req.files.length; i++) {
-      const file      = req.files[i];
-      const imageUrl  = fileUrl("properties", file.filename);
+      const file = req.files[i];
+      const imageUrl = fileUrl("properties", file.filename);
       const isPrimary = isFirstUpload && i === 0 ? 1 : 0;
-      const imgId     = uuidv4();
+      const imgId = uuidv4();
 
       await run(
         `INSERT INTO property_images (id, property_id, image_path, is_primary, sort_order)
          VALUES (?, ?, ?, ?, ?)`,
-        [imgId, propertyId, imageUrl, isPrimary, currentCount + i]
+        [imgId, propertyId, imageUrl, isPrimary, currentCount + i],
       );
 
-      savedImages.push({ id: imgId, image_path: imageUrl, is_primary: isPrimary });
+      savedImages.push({
+        id: imgId,
+        image_path: imageUrl,
+        is_primary: isPrimary,
+      });
     }
 
     return res.status(201).json({ images: savedImages });
@@ -361,9 +409,14 @@ async function getPropertyImages(req, res) {
        FROM property_images
        WHERE property_id = ?
        ORDER BY is_primary DESC, sort_order ASC, created_at ASC`,
-      [propertyId]
+      [propertyId],
     );
-    return res.json({ images: images.map(img => ({ ...img, created_at: isoDate(img.created_at) })) });
+    return res.json({
+      images: images.map((img) => ({
+        ...img,
+        created_at: isoDate(img.created_at),
+      })),
+    });
   } catch (err) {
     console.error("[GetPropertyImages]", err.message);
     return res.status(500).json({ error: "Failed to fetch property images." });
@@ -379,7 +432,7 @@ async function deletePropertyImage(req, res) {
        FROM property_images pi
        JOIN properties p ON pi.property_id = p.id
        WHERE pi.id = ?`,
-      [imageId]
+      [imageId],
     );
     if (!img) {
       return res.status(404).json({ error: "Image not found." });
@@ -398,13 +451,12 @@ async function deletePropertyImage(req, res) {
          WHERE property_id = ?
          ORDER BY sort_order ASC, created_at ASC
          LIMIT 1`,
-        [img.property_id]
+        [img.property_id],
       );
       if (next) {
-        await run(
-          "UPDATE property_images SET is_primary = 1 WHERE id = ?",
-          [next.id]
-        );
+        await run("UPDATE property_images SET is_primary = 1 WHERE id = ?", [
+          next.id,
+        ]);
       }
     }
 
@@ -424,7 +476,7 @@ async function setPrimaryImage(req, res) {
        FROM property_images pi
        JOIN properties p ON pi.property_id = p.id
        WHERE pi.id = ?`,
-      [imageId]
+      [imageId],
     );
     if (!img) {
       return res.status(404).json({ error: "Image not found." });
@@ -436,12 +488,11 @@ async function setPrimaryImage(req, res) {
     // Clear all primary flags for this property then set the selected one
     await run(
       "UPDATE property_images SET is_primary = 0 WHERE property_id = ?",
-      [img.property_id]
+      [img.property_id],
     );
-    await run(
-      "UPDATE property_images SET is_primary = 1 WHERE id = ?",
-      [imageId]
-    );
+    await run("UPDATE property_images SET is_primary = 1 WHERE id = ?", [
+      imageId,
+    ]);
 
     return res.json({ message: "Primary image updated." });
   } catch (err) {
@@ -461,7 +512,7 @@ function serveStaticUpload(req, res) {
   }
 
   // Prevent path traversal
-  const safe     = path.basename(filename);
+  const safe = path.basename(filename);
   const filePath = path.join(UPLOAD_ROOT, subfolder, safe);
 
   if (!fs.existsSync(filePath)) {
@@ -477,7 +528,10 @@ async function listAllVerifications(req, res) {
     const statusFilter = req.query.status || null;
     const params = [];
     let where = "";
-    if (statusFilter) { where = "WHERE vd.status = ?"; params.push(statusFilter); }
+    if (statusFilter) {
+      where = "WHERE vd.status = ?";
+      params.push(statusFilter);
+    }
 
     const rows = await all(
       `SELECT vd.id, vd.user_id, vd.document_type, vd.status,
@@ -487,15 +541,15 @@ async function listAllVerifications(req, res) {
        JOIN users u ON vd.user_id = u.id
        ${where}
        ORDER BY vd.submitted_at DESC`,
-      params
+      params,
     );
 
     return res.json({
-      verifications: rows.map(r => ({
+      verifications: rows.map((r) => ({
         ...r,
         submitted_at: isoDate(r.submitted_at),
-        reviewed_at:  isoDate(r.reviewed_at)
-      }))
+        reviewed_at: isoDate(r.reviewed_at),
+      })),
     });
   } catch (err) {
     console.error("[ListAllVerifications]", err.message);
@@ -507,16 +561,24 @@ async function listAllVerifications(req, res) {
 async function unverifyUser(req, res) {
   try {
     const { userId } = req.params;
-    const reason = (req.body.reason || "Verification revoked by administrator.").trim();
+    const reason = (
+      req.body.reason || "Verification revoked by administrator."
+    ).trim();
 
-    const doc = await get("SELECT id FROM verification_docs WHERE user_id = ?", [userId]);
-    if (!doc) return res.status(404).json({ error: "No verification submission found." });
+    const doc = await get(
+      "SELECT id FROM verification_docs WHERE user_id = ?",
+      [userId],
+    );
+    if (!doc)
+      return res
+        .status(404)
+        .json({ error: "No verification submission found." });
 
     await run(
       `UPDATE verification_docs
        SET status = 'REJECTED', reviewed_at = NOW(), reviewed_by = ?, rejection_reason = ?
        WHERE user_id = ?`,
-      [req.user.id, reason, userId]
+      [req.user.id, reason, userId],
     );
     await run("UPDATE users SET is_verified = 0 WHERE id = ?", [userId]);
 
@@ -542,5 +604,5 @@ module.exports = {
   getPropertyImages,
   deletePropertyImage,
   setPrimaryImage,
-  serveStaticUpload
+  serveStaticUpload,
 };

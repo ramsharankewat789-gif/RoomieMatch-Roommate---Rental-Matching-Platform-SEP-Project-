@@ -30,6 +30,7 @@ import Modal from "@shared/components/common/Modal";
 import Textarea from "@shared/components/common/Textarea";
 import Input from "@shared/components/common/Input";
 import Select from "@shared/components/common/Select";
+import ImageLightbox from "@shared/components/common/ImageLightbox";
 
 const AMENITIES_LIST = [
   "Wifi",
@@ -80,6 +81,14 @@ export const AdminPropertyDetails = () => {
   const [msgLoading, setMsgLoading] = useState(false);
   const [msgSuccess, setMsgSuccess] = useState("");
   const [msgError, setMsgError] = useState("");
+
+  // Lightbox state
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const openLightbox = (index = 0) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -423,7 +432,9 @@ export const AdminPropertyDetails = () => {
                     <img
                       src={coverImage}
                       alt={property.title}
-                      className="w-full h-full object-cover"
+                      onClick={() => openLightbox(0)}
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                      title="Click to view full size"
                     />
                   </div>
                   {(property.images || []).slice(1, 3).map((img, i) => (
@@ -434,7 +445,9 @@ export const AdminPropertyDetails = () => {
                       <img
                         src={img}
                         alt={`${property.title} ${i + 2}`}
-                        className="w-full h-full object-cover"
+                        onClick={() => openLightbox(i + 1)}
+                        className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                        title="Click to view full size"
                       />
                     </div>
                   ))}
@@ -477,16 +490,18 @@ export const AdminPropertyDetails = () => {
                   )}
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {imageData.length > 0
-                      ? imageData.map((img) => (
+                      ? imageData.map((img, idx) => (
                           <div key={img.id} className="relative group shrink-0">
                             <img
                               src={img.image_path}
                               alt=""
-                              className={`w-24 h-16 object-cover rounded-lg border-2 transition-all ${
+                              onClick={() => openLightbox(idx)}
+                              className={`w-24 h-16 object-cover rounded-lg border-2 transition-all cursor-pointer hover:opacity-90 ${
                                 img.is_primary
                                   ? "border-primary shadow-md"
                                   : "border-outline-variant"
                               }`}
+                              title="Click to view full size"
                             />
                             {img.is_primary && (
                               <span className="absolute top-1 left-1 bg-primary text-on-primary text-[9px] font-bold px-1.5 py-0.5 rounded-full">
@@ -955,6 +970,23 @@ export const AdminPropertyDetails = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Full-scale image lightbox */}
+      {lightboxOpen && (
+        <ImageLightbox
+          images={
+            imageData.length > 0
+              ? imageData.map((i) => i.image_path)
+              : (property.images || []).length > 0
+                ? property.images
+                : coverImage
+                  ? [coverImage]
+                  : []
+          }
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </div>
   );
 };

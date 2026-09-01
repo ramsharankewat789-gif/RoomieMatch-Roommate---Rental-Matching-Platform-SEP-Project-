@@ -2,12 +2,17 @@ import React, { useState, useContext, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useProperties } from "@shared/hooks/useProperties";
 import { AuthContext } from "@shared/context/AuthContext";
-import { apiAddFavourite, apiRemoveFavourite, apiGetFavouriteStatus } from "@shared/services/api";
+import {
+  apiAddFavourite,
+  apiRemoveFavourite,
+  apiGetFavouriteStatus,
+} from "@shared/services/api";
 import { formatCurrency } from "@shared/utils/currency";
 import Input from "@shared/components/common/Input";
 import Select from "@shared/components/common/Select";
 import EmptyState from "@shared/components/common/EmptyState";
 import PropertyMap from "@shared/components/common/PropertyMap";
+import ImageLightbox from "@shared/components/common/ImageLightbox";
 
 export const PropertySearch = () => {
   const { properties } = useProperties();
@@ -32,14 +37,26 @@ export const PropertySearch = () => {
 
   const toggleAmenity = (amenity) => {
     if (selectedAmenities.includes(amenity)) {
-      setSelectedAmenities(prev => prev.filter(a => a !== amenity));
+      setSelectedAmenities((prev) => prev.filter((a) => a !== amenity));
     } else {
-      setSelectedAmenities(prev => [...prev, amenity]);
+      setSelectedAmenities((prev) => [...prev, amenity]);
     }
   };
 
   // Favourites state — loaded from real API
   const [favouriteIds, setFavouriteIds] = useState(new Set());
+
+  // Lightbox state
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState([]);
+  const openLightbox = (images, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (images && images.length > 0) {
+      setLightboxImages(images);
+      setLightboxOpen(true);
+    }
+  };
 
   const handleFavoriteToggle = async (propId, e) => {
     e.preventDefault();
@@ -48,10 +65,14 @@ export const PropertySearch = () => {
     try {
       if (favouriteIds.has(propId)) {
         await apiRemoveFavourite(propId);
-        setFavouriteIds(prev => { const s = new Set(prev); s.delete(propId); return s; });
+        setFavouriteIds((prev) => {
+          const s = new Set(prev);
+          s.delete(propId);
+          return s;
+        });
       } else {
         await apiAddFavourite(propId);
-        setFavouriteIds(prev => new Set([...prev, propId]));
+        setFavouriteIds((prev) => new Set([...prev, propId]));
       }
     } catch (err) {
       console.warn("Favourite toggle failed:", err.message);
@@ -60,7 +81,7 @@ export const PropertySearch = () => {
   // Filter logic
   const filteredProperties = properties.filter((p) => {
     if (p.status !== "active") return false;
-    
+
     // Text search (Title, address, description, city)
     if (search) {
       const q = search.toLowerCase();
@@ -71,22 +92,22 @@ export const PropertySearch = () => {
         p.description.toLowerCase().includes(q);
       if (!matchText) return false;
     }
-    
+
     // City filter (exact match, case-insensitive)
     if (city && !p.city.toLowerCase().includes(city.toLowerCase())) {
       return false;
     }
-    
+
     // Max price
     if (maxPrice && p.price > Number(maxPrice)) {
       return false;
     }
-    
+
     // Property type
     if (type && p.type !== type) {
       return false;
     }
-    
+
     // Bedrooms
     if (bedrooms) {
       if (bedrooms === "3+") {
@@ -97,13 +118,13 @@ export const PropertySearch = () => {
         }
       }
     }
-    
+
     // Amenities
     if (selectedAmenities.length > 0) {
-      const hasAll = selectedAmenities.every(a => p.amenities.includes(a));
+      const hasAll = selectedAmenities.every((a) => p.amenities.includes(a));
       if (!hasAll) return false;
     }
-    
+
     return true;
   });
 
@@ -116,27 +137,29 @@ export const PropertySearch = () => {
     "Garage Parking",
     "Fully Furnished",
     "Dishwasher",
-    "Private Backyard"
+    "Private Backyard",
   ];
 
   const typeOptions = [
     { value: "", label: "All Types" },
     { value: "Apartment", label: "Apartment" },
     { value: "Townhouse", label: "Townhouse" },
-    { value: "Studio", label: "Studio" }
+    { value: "Studio", label: "Studio" },
   ];
 
   const bedroomOptions = [
     { value: "", label: "Any Bedrooms" },
     { value: "1", label: "1 Bedroom / Studio" },
     { value: "2", label: "2 Bedrooms" },
-    { value: "3+", label: "3+ Bedrooms" }
+    { value: "3+", label: "3+ Bedrooms" },
   ];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="font-headline-md text-headline-md text-on-surface">Search Verified Properties</h1>
+        <h1 className="font-headline-md text-headline-md text-on-surface">
+          Search Verified Properties
+        </h1>
         <p className="font-body-md text-body-md text-on-surface-variant mt-1">
           Browse rental rooms and whole units verified by university guidelines
         </p>
@@ -221,7 +244,7 @@ export const PropertySearch = () => {
       ) : (
         <>
           {/* Map view of all results */}
-          {filteredProperties.some(p => p.latitude && p.longitude) && (
+          {filteredProperties.some((p) => p.latitude && p.longitude) && (
             <section className="rounded-xl overflow-hidden border border-outline-variant shadow-sm">
               <PropertyMap
                 properties={filteredProperties}
@@ -233,9 +256,10 @@ export const PropertySearch = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {filteredProperties.map((prop) => {
-              const imgSrc  = prop.cover_image || prop.images?.[0] || null;
+              const imgSrc = prop.cover_image || prop.images?.[0] || null;
               const isFaved = favouriteIds.has(prop.id);
-              const verified = prop.is_verified === 1 || prop.is_verified === true;
+              const verified =
+                prop.is_verified === 1 || prop.is_verified === true;
               const availFrom = prop.available_from
                 ? new Date(prop.available_from).toLocaleDateString()
                 : "Now";
@@ -248,17 +272,34 @@ export const PropertySearch = () => {
                   {/* Card Image */}
                   <div className="relative h-48 w-full bg-surface-container">
                     {imgSrc ? (
-                      <img src={imgSrc} alt={prop.title} className="w-full h-full object-cover" />
+                      <img
+                        src={imgSrc}
+                        alt={prop.title}
+                        onClick={(e) =>
+                          openLightbox(
+                            prop.images && prop.images.length > 0
+                              ? prop.images
+                              : [imgSrc],
+                            e,
+                          )
+                        }
+                        className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                        title="Click to view full size"
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-outline">
-                        <span className="material-symbols-outlined text-[48px]">home_work</span>
+                        <span className="material-symbols-outlined text-[48px]">
+                          home_work
+                        </span>
                       </div>
                     )}
 
                     {/* Verification Badge */}
                     {verified && (
                       <div className="absolute top-3 left-3 bg-secondary-container text-on-secondary-container px-2.5 py-0.5 rounded-full font-label-sm text-label-sm border border-secondary flex items-center gap-0.5 font-bold shadow-sm">
-                        <span className="material-symbols-outlined text-sm icon-fill">verified</span>
+                        <span className="material-symbols-outlined text-sm icon-fill">
+                          verified
+                        </span>
                         VERIFIED
                       </div>
                     )}
@@ -268,9 +309,13 @@ export const PropertySearch = () => {
                       <button
                         onClick={(e) => handleFavoriteToggle(prop.id, e)}
                         className="absolute top-3 right-3 p-2 bg-surface-container-lowest/90 hover:bg-surface-container-lowest border border-outline-variant rounded-full transition-transform flex items-center justify-center shadow-sm select-none"
-                        title={isFaved ? "Remove from Favourites" : "Save Property"}
+                        title={
+                          isFaved ? "Remove from Favourites" : "Save Property"
+                        }
                       >
-                        <span className={`material-symbols-outlined text-[20px] ${isFaved ? "text-error icon-fill" : "text-outline"}`}>
+                        <span
+                          className={`material-symbols-outlined text-[20px] ${isFaved ? "text-error icon-fill" : "text-outline"}`}
+                        >
                           favorite
                         </span>
                       </button>
@@ -292,22 +337,31 @@ export const PropertySearch = () => {
                       </p>
                       <div className="flex items-center gap-4 text-xs text-on-surface-variant font-medium mt-3">
                         <span className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm">bed</span>
+                          <span className="material-symbols-outlined text-sm">
+                            bed
+                          </span>
                           {prop.bedrooms} Bed
                         </span>
                         <span className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm">bathtub</span>
+                          <span className="material-symbols-outlined text-sm">
+                            bathtub
+                          </span>
                           {prop.bathrooms} Bath
                         </span>
                       </div>
                     </div>
                     <div className="flex justify-between items-center border-t border-outline-variant/60 pt-3">
                       <span className="font-headline-sm text-headline-sm text-primary font-bold">
-                        {formatCurrency(prop.price)}<span className="text-xs text-outline font-normal">/mo</span>
+                        {formatCurrency(prop.price)}
+                        <span className="text-xs text-outline font-normal">
+                          /mo
+                        </span>
                       </span>
                       <span className="text-xs text-primary font-bold flex items-center gap-0.5">
                         View Details
-                        <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                        <span className="material-symbols-outlined text-[16px]">
+                          chevron_right
+                        </span>
                       </span>
                     </div>
                   </div>
@@ -316,6 +370,15 @@ export const PropertySearch = () => {
             })}
           </div>
         </>
+      )}
+
+      {/* Full-scale image lightbox */}
+      {lightboxOpen && (
+        <ImageLightbox
+          images={lightboxImages}
+          startIndex={0}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
     </div>
   );

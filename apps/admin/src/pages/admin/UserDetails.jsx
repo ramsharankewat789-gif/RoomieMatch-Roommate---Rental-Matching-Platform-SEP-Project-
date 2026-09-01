@@ -55,9 +55,40 @@ export const UserDetails = () => {
   }, [id]);
 
   // ── Verify toggle ─────────────────────────────────────────────────────────
+  const getVerifyBlockReasons = (u) => {
+    if (!u) return [];
+    const reasons = [];
+    if (!u.age || Number(u.age) < 18) {
+      reasons.push(
+        u.age
+          ? `Age is ${u.age} — must be 18 or older`
+          : "Age not provided (must be 18+)",
+      );
+    }
+    if (!u.profile_image && !u.avatar) reasons.push("Profile photo missing");
+    if (!u.name?.trim()) reasons.push("Name not set");
+    const docStatus = u.verificationDoc?.status;
+    if (docStatus !== "PENDING" && docStatus !== "APPROVED") {
+      reasons.push("No verification document submitted");
+    }
+    return reasons;
+  };
+
   const handleVerifyToggle = async () => {
     if (actionLoading) return;
     const isNowVerified = user.is_verified === 1 || user.is_verified === true;
+
+    if (!isNowVerified) {
+      const blockReasons = getVerifyBlockReasons(user);
+      if (blockReasons.length > 0) {
+        alert(
+          "Cannot verify this user. Requirements not met:\n\n• " +
+            blockReasons.join("\n• "),
+        );
+        return;
+      }
+    }
+
     setActionLoading(true);
     try {
       if (isNowVerified) {
@@ -423,25 +454,60 @@ export const UserDetails = () => {
             </h2>
 
             {/* ── VERIFY / UNVERIFY TOGGLE SWITCH ── */}
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-on-surface-variant font-semibold">
-                {verified ? "Verified" : "Unverified"}
-              </span>
-              <button
-                onClick={handleVerifyToggle}
-                disabled={actionLoading}
-                title={verified ? "Click to unverify" : "Click to verify"}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-                  verified ? "bg-secondary" : "bg-outline-variant"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                    verified ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
+            {(() => {
+              const blockReasons = getVerifyBlockReasons(user);
+              const canVerify = verified || blockReasons.length === 0;
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-on-surface-variant font-semibold">
+                      {verified ? "Verified" : "Unverified"}
+                    </span>
+                    <button
+                      onClick={handleVerifyToggle}
+                      disabled={actionLoading || (!verified && !canVerify)}
+                      title={
+                        verified
+                          ? "Click to unverify"
+                          : blockReasons.length > 0
+                            ? "Requirements not met — see below"
+                            : "Click to verify"
+                      }
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                        verified ? "bg-secondary" : "bg-outline-variant"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                          verified ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {/* Show what's blocking verification */}
+                  {!verified && blockReasons.length > 0 && (
+                    <div className="p-2 bg-error-container/10 border border-error/20 rounded-lg">
+                      <p className="text-[10px] text-error font-bold uppercase tracking-wider mb-1">
+                        Cannot verify — requirements missing:
+                      </p>
+                      <ul className="space-y-0.5">
+                        {blockReasons.map((r, i) => (
+                          <li
+                            key={i}
+                            className="text-[11px] text-error flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[12px]">
+                              cancel
+                            </span>
+                            {r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {verifDoc.status && verifDoc.status !== "NOT_SUBMITTED" ? (

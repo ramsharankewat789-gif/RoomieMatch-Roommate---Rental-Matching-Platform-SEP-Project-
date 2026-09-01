@@ -32,24 +32,39 @@ async function buildUserResponse(userId) {
 
   const prefs = await get(
     "SELECT smoke, pet, cleanliness, sleep_schedule, social_life, cooking, drinking, guests, food, working_hours FROM user_preferences WHERE user_id = ?",
-    [userId]
+    [userId],
   );
   safe.preferences = prefs
-    ? { smoke: prefs.smoke, pet: prefs.pet, clean: prefs.cleanliness,
-        sleep: prefs.sleep_schedule, social: prefs.social_life, cooking: prefs.cooking,
-        drinking: prefs.drinking, guests: prefs.guests, food: prefs.food,
-        working_hours: prefs.working_hours }
+    ? {
+        smoke: prefs.smoke,
+        pet: prefs.pet,
+        clean: prefs.cleanliness,
+        sleep: prefs.sleep_schedule,
+        social: prefs.social_life,
+        cooking: prefs.cooking,
+        drinking: prefs.drinking,
+        guests: prefs.guests,
+        food: prefs.food,
+        working_hours: prefs.working_hours,
+      }
     : {};
 
-  const hobbyRows = await all("SELECT hobby FROM user_hobbies WHERE user_id = ? ORDER BY id", [userId]);
-  safe.hobbies = hobbyRows.map(r => r.hobby);
+  const hobbyRows = await all(
+    "SELECT hobby FROM user_hobbies WHERE user_id = ? ORDER BY id",
+    [userId],
+  );
+  safe.hobbies = hobbyRows.map((r) => r.hobby);
 
   const vdoc = await get(
     "SELECT status, document_type, submitted_at FROM verification_docs WHERE user_id = ?",
-    [userId]
+    [userId],
   );
   safe.verificationDoc = vdoc
-    ? { status: vdoc.status, type: vdoc.document_type, submittedAt: isoDate(vdoc.submitted_at) }
+    ? {
+        status: vdoc.status,
+        type: vdoc.document_type,
+        submittedAt: isoDate(vdoc.submitted_at),
+      }
     : { status: "NOT_SUBMITTED" };
 
   return safe;
@@ -61,15 +76,15 @@ async function buildUserResponse(userId) {
 async function listUsers(req, res) {
   try {
     const isAdmin = req.user?.role === "admin";
-    const page    = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit   = Math.min(100, parseInt(req.query.limit) || 20);
-    const offset  = (page - 1) * limit;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 20);
+    const offset = (page - 1) * limit;
 
-    const search     = req.query.search ? `%${req.query.search}%` : null;
-    const roleFilter = req.query.role   || null;
+    const search = req.query.search ? `%${req.query.search}%` : null;
+    const roleFilter = req.query.role || null;
 
     let whereClauses = [];
-    let params       = [];
+    let params = [];
 
     if (search) {
       whereClauses.push("(u.name LIKE ? OR u.email LIKE ?)");
@@ -87,11 +102,13 @@ async function listUsers(req, res) {
       params.push(req.user.id);
     }
 
-    const where = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
+    const where = whereClauses.length
+      ? "WHERE " + whereClauses.join(" AND ")
+      : "";
 
     const [countRow] = await all(
       `SELECT COUNT(*) AS total FROM users u ${where}`,
-      params
+      params,
     );
 
     // Admin gets email + verification status; non-admin gets public-safe fields only
@@ -115,51 +132,55 @@ async function listUsers(req, res) {
        ${where}
        ORDER BY u.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+      [...params, limit, offset],
     );
 
     // For non-admin, reshape preferences into nested object and fetch hobbies
     let shaped = users;
     if (!isAdmin) {
-      shaped = await Promise.all(users.map(async u => {
-        const hobbyRows = await all(
-          "SELECT hobby FROM user_hobbies WHERE user_id = ? ORDER BY id", [u.id]
-        );
-        return {
-          id:           u.id,
-          name:         u.name,
-          role:         u.role,
-          profile_image: u.profile_image,
-          university:   u.university,
-          major:        u.major,
-          age:          u.age,
-          gender:       u.gender,
-          budget_min:   u.budget_min,
-          budget_max:   u.budget_max,
-          bio:          u.bio,
-          is_verified:  u.is_verified,
-          hobbies:      hobbyRows.map(r => r.hobby),
-          preferences: {
-            smoke:   u.smoke,
-            pet:     u.pet,
-            clean:   u.cleanliness,
-            sleep:   u.sleep_schedule,
-            social:  u.social_life,
-            cooking: u.cooking,
-          }
-        };
-      }));
+      shaped = await Promise.all(
+        users.map(async (u) => {
+          const hobbyRows = await all(
+            "SELECT hobby FROM user_hobbies WHERE user_id = ? ORDER BY id",
+            [u.id],
+          );
+          return {
+            id: u.id,
+            name: u.name,
+            role: u.role,
+            profile_image: u.profile_image,
+            university: u.university,
+            major: u.major,
+            age: u.age,
+            gender: u.gender,
+            budget_min: u.budget_min,
+            budget_max: u.budget_max,
+            bio: u.bio,
+            is_verified: u.is_verified,
+            hobbies: hobbyRows.map((r) => r.hobby),
+            preferences: {
+              smoke: u.smoke,
+              pet: u.pet,
+              clean: u.cleanliness,
+              sleep: u.sleep_schedule,
+              social: u.social_life,
+              cooking: u.cooking,
+            },
+          };
+        }),
+      );
     } else {
-      shaped = users.map(u => ({ ...u, created_at: isoDate(u.created_at) }));
+      shaped = users.map((u) => ({ ...u, created_at: isoDate(u.created_at) }));
     }
 
     return res.json({
       users: shaped,
       pagination: {
         total: countRow?.total || 0,
-        page, limit,
-        pages: Math.ceil((countRow?.total || 0) / limit)
-      }
+        page,
+        limit,
+        pages: Math.ceil((countRow?.total || 0) / limit),
+      },
     });
   } catch (err) {
     console.error("[ListUsers]", err.message);
@@ -189,9 +210,9 @@ async function getUser(req, res) {
 // ── PATCH /api/users/:id ───────────────────────────────────────────────────
 async function updateUser(req, res) {
   try {
-    const { id }     = req.params;
+    const { id } = req.params;
     const requesterId = req.user.id;
-    const isAdmin     = req.user.role === "admin";
+    const isAdmin = req.user.role === "admin";
 
     if (!isAdmin && requesterId !== id) {
       return res.status(403).json({ error: "Access denied." });
@@ -201,47 +222,117 @@ async function updateUser(req, res) {
     if (!existing) return res.status(404).json({ error: "User not found." });
 
     const {
-      name, phone, university, major,
-      age, gender, city, budget_min, budget_max, bio,
+      name,
+      phone,
+      university,
+      major,
+      age,
+      gender,
+      city,
+      budget_min,
+      budget_max,
+      bio,
       // preferences
-      smoke, pet, clean, sleep, social, cooking, drinking, guests, food, working_hours,
+      smoke,
+      pet,
+      clean,
+      sleep,
+      social,
+      cooking,
+      drinking,
+      guests,
+      food,
+      working_hours,
       // hobbies
-      hobbies
+      hobbies,
     } = req.body;
 
     // Build dynamic SET clause for users table
     const userUpdates = [];
-    const userParams  = [];
+    const userParams = [];
 
-    if (name       !== undefined) { userUpdates.push("name = ?");       userParams.push(name.trim()); }
-    if (phone      !== undefined) { userUpdates.push("phone = ?");      userParams.push(phone || null); }
-    if (university !== undefined) { userUpdates.push("university = ?"); userParams.push(university || null); }
-    if (major      !== undefined) { userUpdates.push("major = ?");      userParams.push(major || null); }
-    if (age        !== undefined) { userUpdates.push("age = ?");        userParams.push(Number(age) || null); }
-    if (gender     !== undefined) { userUpdates.push("gender = ?");     userParams.push(gender || null); }
-    if (city       !== undefined) { userUpdates.push("city = ?");       userParams.push(city || null); }
-    if (budget_min !== undefined) { userUpdates.push("budget_min = ?"); userParams.push(Number(budget_min) || null); }
-    if (budget_max !== undefined) { userUpdates.push("budget_max = ?"); userParams.push(Number(budget_max) || null); }
-    if (bio        !== undefined) { userUpdates.push("bio = ?");        userParams.push(bio || null); }
+    if (name !== undefined) {
+      userUpdates.push("name = ?");
+      userParams.push(name.trim());
+    }
+    if (phone !== undefined) {
+      userUpdates.push("phone = ?");
+      userParams.push(phone || null);
+    }
+    if (university !== undefined) {
+      userUpdates.push("university = ?");
+      userParams.push(university || null);
+    }
+    if (major !== undefined) {
+      userUpdates.push("major = ?");
+      userParams.push(major || null);
+    }
+    if (age !== undefined) {
+      const ageNum = Number(age);
+      if (ageNum !== null && !isNaN(ageNum) && ageNum > 0 && ageNum < 18) {
+        return res
+          .status(400)
+          .json({ error: "You must be 18 or older to use RoomieMatch." });
+      }
+      userUpdates.push("age = ?");
+      userParams.push(ageNum || null);
+    }
+    if (gender !== undefined) {
+      userUpdates.push("gender = ?");
+      userParams.push(gender || null);
+    }
+    if (city !== undefined) {
+      userUpdates.push("city = ?");
+      userParams.push(city || null);
+    }
+    if (budget_min !== undefined) {
+      userUpdates.push("budget_min = ?");
+      userParams.push(Number(budget_min) || null);
+    }
+    if (budget_max !== undefined) {
+      userUpdates.push("budget_max = ?");
+      userParams.push(Number(budget_max) || null);
+    }
+    if (bio !== undefined) {
+      userUpdates.push("bio = ?");
+      userParams.push(bio || null);
+    }
 
     if (userUpdates.length > 0) {
       userParams.push(id);
       await run(
         `UPDATE users SET ${userUpdates.join(", ")} WHERE id = ?`,
-        userParams
+        userParams,
       );
     }
 
     // Update preferences if any preference fields supplied
-    const prefFields = { smoke, pet, clean, sleep, social, cooking, drinking, guests, food, working_hours };
+    const prefFields = {
+      smoke,
+      pet,
+      clean,
+      sleep,
+      social,
+      cooking,
+      drinking,
+      guests,
+      food,
+      working_hours,
+    };
     const prefUpdates = [];
-    const prefParams  = [];
+    const prefParams = [];
 
     const prefColumnMap = {
-      smoke: "smoke", pet: "pet", clean: "cleanliness",
-      sleep: "sleep_schedule", social: "social_life", cooking: "cooking",
-      drinking: "drinking", guests: "guests", food: "food",
-      working_hours: "working_hours"
+      smoke: "smoke",
+      pet: "pet",
+      clean: "cleanliness",
+      sleep: "sleep_schedule",
+      social: "social_life",
+      cooking: "cooking",
+      drinking: "drinking",
+      guests: "guests",
+      food: "food",
+      working_hours: "working_hours",
     };
 
     for (const [key, col] of Object.entries(prefColumnMap)) {
@@ -254,10 +345,12 @@ async function updateUser(req, res) {
     if (prefUpdates.length > 0) {
       prefParams.push(id);
       // Ensure preferences row exists first
-      await run("INSERT IGNORE INTO user_preferences (user_id) VALUES (?)", [id]);
+      await run("INSERT IGNORE INTO user_preferences (user_id) VALUES (?)", [
+        id,
+      ]);
       await run(
         `UPDATE user_preferences SET ${prefUpdates.join(", ")} WHERE user_id = ?`,
-        prefParams
+        prefParams,
       );
     }
 
@@ -269,7 +362,7 @@ async function updateUser(req, res) {
         if (h) {
           await run(
             "INSERT IGNORE INTO user_hobbies (user_id, hobby) VALUES (?, ?)",
-            [id, h]
+            [id, h],
           );
         }
       }
@@ -289,7 +382,11 @@ async function deleteUser(req, res) {
     const { id } = req.params;
 
     if (id === req.user.id) {
-      return res.status(400).json({ error: "Admins cannot delete their own account via this endpoint." });
+      return res
+        .status(400)
+        .json({
+          error: "Admins cannot delete their own account via this endpoint.",
+        });
     }
 
     const existing = await get("SELECT id FROM users WHERE id = ?", [id]);
@@ -310,13 +407,20 @@ async function blockUser(req, res) {
     const { id } = req.params;
 
     if (id === req.user.id) {
-      return res.status(400).json({ error: "Admins cannot block their own account." });
+      return res
+        .status(400)
+        .json({ error: "Admins cannot block their own account." });
     }
 
-    const existing = await get("SELECT id, name, role FROM users WHERE id = ?", [id]);
+    const existing = await get(
+      "SELECT id, name, role FROM users WHERE id = ?",
+      [id],
+    );
     if (!existing) return res.status(404).json({ error: "User not found." });
     if (existing.role === "admin") {
-      return res.status(400).json({ error: "Admin accounts cannot be blocked." });
+      return res
+        .status(400)
+        .json({ error: "Admin accounts cannot be blocked." });
     }
 
     await run("UPDATE users SET is_blocked = 1 WHERE id = ?", [id]);
@@ -358,7 +462,7 @@ async function getUserVerification(req, res) {
       `SELECT id, document_type, status, rejection_reason,
               submitted_at, reviewed_at
        FROM verification_docs WHERE user_id = ?`,
-      [id]
+      [id],
     );
 
     if (!doc) return res.json({ status: "NOT_SUBMITTED" });
@@ -366,7 +470,7 @@ async function getUserVerification(req, res) {
     return res.json({
       ...doc,
       submitted_at: isoDate(doc.submitted_at),
-      reviewed_at:  isoDate(doc.reviewed_at)
+      reviewed_at: isoDate(doc.reviewed_at),
     });
   } catch (err) {
     console.error("[GetUserVerification]", err.message);
