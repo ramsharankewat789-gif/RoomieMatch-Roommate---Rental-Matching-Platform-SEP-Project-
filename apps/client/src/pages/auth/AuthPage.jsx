@@ -15,7 +15,7 @@ export const AuthPage = () => {
   const location = useLocation();
   const { currentUser } = useContext(AuthContext);
   const { login, register } = useAuth();
-  
+
   // Set initial state based on route - if /register, show register form
   const [isActive, setIsActive] = useState(location.pathname === "/register");
 
@@ -24,6 +24,7 @@ export const AuthPage = () => {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [showLoginPw, setShowLoginPw] = useState(false);
 
   // Register form state
   const [regName, setRegName] = useState("");
@@ -33,6 +34,8 @@ export const AuthPage = () => {
   const [regPhone, setRegPhone] = useState("");
   const [regError, setRegError] = useState("");
   const [regLoading, setRegLoading] = useState(false);
+  const [showRegPw, setShowRegPw] = useState(false);
+  const [showRegConfirmPw, setShowRegConfirmPw] = useState(false);
 
   // Redirect if already logged in
   React.useEffect(() => {
@@ -63,7 +66,7 @@ export const AuthPage = () => {
   const handleRegister = async (e) => {
     e.preventDefault();
     setRegError("");
-    
+
     // Validation
     if (regPassword !== regConfirmPassword) {
       setRegError("Passwords do not match.");
@@ -73,15 +76,40 @@ export const AuthPage = () => {
       setRegError("Password must be at least 6 characters.");
       return;
     }
-    
+
+    // Phone validation — if provided, must have exactly 10 local digits
+    if (regPhone.trim()) {
+      const localDigits = regPhone
+        .trim()
+        .replace(/^\+?\d{1,3}[\s\-]?/, "")
+        .replace(/\D/g, "");
+      const allDigits = regPhone.trim().replace(/\D/g, "");
+      // Accept formats: +977XXXXXXXXXX, 977XXXXXXXXXX, 0XXXXXXXXXX, XXXXXXXXXX
+      // Local portion must be exactly 10 digits
+      if (!/^\+?[\d\s\-().]{7,20}$/.test(regPhone.trim())) {
+        setRegError(
+          "Phone number contains invalid characters. Use digits, spaces, +, -, ( ) only.",
+        );
+        return;
+      }
+      // Extract local digits (strip leading country code if present)
+      const stripped = allDigits.replace(/^(977|0)/, "");
+      if (stripped.length !== 10) {
+        setRegError(
+          "Local phone number must be exactly 10 digits (e.g. 9812345678).",
+        );
+        return;
+      }
+    }
+
     setRegLoading(true);
 
     try {
-      await register({ 
-        name: regName, 
-        email: regEmail, 
+      await register({
+        name: regName,
+        email: regEmail,
         password: regPassword,
-        phone: regPhone 
+        phone: regPhone,
       });
       navigate("/verify-email", { state: { email: regEmail } });
     } catch (err) {
@@ -111,12 +139,12 @@ export const AuthPage = () => {
           try {
             const data = await apiGoogleAuth(response.credential);
             navigate("/verify-otp", {
-              state: { pendingId: data.pendingId, email: data.email }
+              state: { pendingId: data.pendingId, email: data.email },
             });
           } catch (err) {
             setLoginError(err.message || "Google sign-in failed.");
           }
-        }
+        },
       });
       window.google?.accounts.id.prompt();
     };
@@ -126,7 +154,6 @@ export const AuthPage = () => {
   return (
     <div className="auth-page-wrapper">
       <div className={`auth-container ${isActive ? "active" : ""}`}>
-        
         {/* Login Form */}
         <div className="form-box login">
           <form onSubmit={handleLogin}>
@@ -134,7 +161,7 @@ export const AuthPage = () => {
 
             {loginError && (
               <div className="error-message">
-                <i className='bx bxs-error'></i>
+                <i className="bx bxs-error"></i>
                 <span>{loginError}</span>
               </div>
             )}
@@ -148,19 +175,24 @@ export const AuthPage = () => {
                 onChange={(e) => setLoginEmail(e.target.value)}
                 disabled={loginLoading}
               />
-              <i className='bx bxs-envelope'></i>
+              <i className="bx bxs-envelope"></i>
             </div>
 
             <div className="input-box">
               <input
-                type="password"
+                type={showLoginPw ? "text" : "password"}
                 placeholder="Password"
                 required
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 disabled={loginLoading}
               />
-              <i className='bx bxs-lock-alt'></i>
+              <i
+                className={`bx ${showLoginPw ? "bxs-hide" : "bxs-show"}`}
+                style={{ cursor: "pointer" }}
+                onClick={() => setShowLoginPw((v) => !v)}
+                title={showLoginPw ? "Hide password" : "Show password"}
+              ></i>
             </div>
 
             <div className="forgot-link">
@@ -177,7 +209,9 @@ export const AuthPage = () => {
                   </div>
                   Logging in...
                 </span>
-              ) : "Login"}
+              ) : (
+                "Login"
+              )}
             </button>
           </form>
         </div>
@@ -189,7 +223,7 @@ export const AuthPage = () => {
 
             {regError && (
               <div className="error-message">
-                <i className='bx bxs-error'></i>
+                <i className="bx bxs-error"></i>
                 <span>{regError}</span>
               </div>
             )}
@@ -203,7 +237,7 @@ export const AuthPage = () => {
                 onChange={(e) => setRegName(e.target.value)}
                 disabled={regLoading}
               />
-              <i className='bx bxs-user'></i>
+              <i className="bx bxs-user"></i>
             </div>
 
             <div className="input-box">
@@ -215,7 +249,7 @@ export const AuthPage = () => {
                 onChange={(e) => setRegEmail(e.target.value)}
                 disabled={regLoading}
               />
-              <i className='bx bxs-envelope'></i>
+              <i className="bx bxs-envelope"></i>
             </div>
 
             <div className="input-box">
@@ -226,31 +260,41 @@ export const AuthPage = () => {
                 onChange={(e) => setRegPhone(e.target.value)}
                 disabled={regLoading}
               />
-              <i className='bx bxs-phone'></i>
+              <i className="bx bxs-phone"></i>
             </div>
 
             <div className="input-box">
               <input
-                type="password"
+                type={showRegPw ? "text" : "password"}
                 placeholder="Password (min 6 characters)"
                 required
                 value={regPassword}
                 onChange={(e) => setRegPassword(e.target.value)}
                 disabled={regLoading}
               />
-              <i className='bx bxs-lock-alt'></i>
+              <i
+                className={`bx ${showRegPw ? "bxs-hide" : "bxs-show"}`}
+                style={{ cursor: "pointer" }}
+                onClick={() => setShowRegPw((v) => !v)}
+                title={showRegPw ? "Hide password" : "Show password"}
+              ></i>
             </div>
 
             <div className="input-box">
               <input
-                type="password"
+                type={showRegConfirmPw ? "text" : "password"}
                 placeholder="Confirm Password"
                 required
                 value={regConfirmPassword}
                 onChange={(e) => setRegConfirmPassword(e.target.value)}
                 disabled={regLoading}
               />
-              <i className='bx bxs-lock'></i>
+              <i
+                className={`bx ${showRegConfirmPw ? "bxs-hide" : "bxs-show"}`}
+                style={{ cursor: "pointer" }}
+                onClick={() => setShowRegConfirmPw((v) => !v)}
+                title={showRegConfirmPw ? "Hide password" : "Show password"}
+              ></i>
             </div>
 
             <button type="submit" className="btn" disabled={regLoading}>
@@ -263,7 +307,9 @@ export const AuthPage = () => {
                   </div>
                   Signing up...
                 </span>
-              ) : "Sign Up"}
+              ) : (
+                "Sign Up"
+              )}
             </button>
           </form>
         </div>
@@ -273,7 +319,10 @@ export const AuthPage = () => {
           <div className="toggle-panel toggle-left">
             <h1>Hello, Welcome!</h1>
             <p>Don't have an account?</p>
-            <button className="btn register-btn" onClick={() => setIsActive(true)}>
+            <button
+              className="btn register-btn"
+              onClick={() => setIsActive(true)}
+            >
               Sign Up
             </button>
           </div>
@@ -281,7 +330,10 @@ export const AuthPage = () => {
           <div className="toggle-panel toggle-right">
             <h1>Welcome Back!</h1>
             <p>Already have an account?</p>
-            <button className="btn login-btn" onClick={() => setIsActive(false)}>
+            <button
+              className="btn login-btn"
+              onClick={() => setIsActive(false)}
+            >
               Login
             </button>
           </div>
